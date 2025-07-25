@@ -26,7 +26,7 @@ const DPPUpload = ({ onFileUploaded }: DPPUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const storage = new SolidStorageService();
+  const storage = SolidStorageService.getInstance();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -97,7 +97,7 @@ const DPPUpload = ({ onFileUploaded }: DPPUploadProps) => {
         });
       }, 100);
 
-      const fileUrl = await storage.uploadDPPFile(selectedFile);
+      const fileUrl = await storage.uploadDPP(selectedFile);
       
       clearInterval(progressInterval);
       setUploadProgress(100);

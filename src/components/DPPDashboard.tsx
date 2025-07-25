@@ -31,7 +31,7 @@ const DPPDashboard = ({ onLogout }: DPPDashboardProps) => {
   const [activeTab, setActiveTab] = useState('overview');
   
   const auth = SolidAuthService.getInstance();
-  const storage = new SolidStorageService();
+  const storage = SolidStorageService.getInstance();
   const sessionInfo = auth.getSessionInfo();
 
   useEffect(() => {

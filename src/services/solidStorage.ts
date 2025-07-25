@@ -18,11 +18,19 @@ export interface DPPFile {
 }
 
 export class SolidStorageService {
+  private static instance: SolidStorageService;
   private auth: SolidAuthService;
   private dppFolderPath = "dpp/";
 
-  constructor() {
+  private constructor() {
     this.auth = SolidAuthService.getInstance();
+  }
+
+  static getInstance(): SolidStorageService {
+    if (!SolidStorageService.instance) {
+      SolidStorageService.instance = new SolidStorageService();
+    }
+    return SolidStorageService.instance;
   }
 
   private async getPodRoot(): Promise<string> {
@@ -64,7 +72,7 @@ export class SolidStorageService {
     }
   }
 
-  async uploadDPPFile(file: File): Promise<string> {
+  async uploadDPP(file: File): Promise<string> {
     await this.ensureDPPFolderExists();
     
     const dppFolderUrl = await this.getDPPFolderUrl();
@@ -122,13 +130,13 @@ export class SolidStorageService {
     }
   }
 
-  async getDPPFileContent(fileUrl: string): Promise<string> {
+  async getDPPContent(fileUrl: string): Promise<string> {
     const fetch = this.auth.getFetch();
     const file = await getFile(fileUrl, { fetch });
     return await file.text();
   }
 
-  async deleteDPPFile(fileUrl: string): Promise<void> {
+  async deleteDPP(fileUrl: string): Promise<void> {
     const fetch = this.auth.getFetch();
     
     await fetch(fileUrl, {

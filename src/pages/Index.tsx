@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { SolidAuthService } from '@/services/solidAuth';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -45,14 +48,22 @@ const Index = () => {
     );
   }
 
+  if (!isAuthenticated) {
+    return <SolidLogin onLoginAttempt={handleLoginAttempt} />;
+  }
+
   return (
-    <>
-      {isAuthenticated ? (
-        <DPPDashboard onLogout={handleLogout} />
-      ) : (
-        <SolidLogin onLoginAttempt={handleLoginAttempt} />
-      )}
-    </>
+    <div className="relative">
+      <div className="absolute top-4 right-4 z-10">
+        <Link to="/admin">
+          <Button variant="outline" size="sm">
+            <Settings className="w-4 h-4 mr-2" />
+            Admin Panel
+          </Button>
+        </Link>
+      </div>
+      <DPPDashboard onLogout={handleLogout} />
+    </div>
   );
 };
 

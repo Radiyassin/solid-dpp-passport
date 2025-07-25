@@ -35,14 +35,14 @@ const DPPList = ({ files, onFilesChanged }: DPPListProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
-  const storage = new SolidStorageService();
+  const storage = SolidStorageService.getInstance();
 
   const handleViewFile = async (file: DPPFile) => {
     setSelectedFile(file);
     setIsLoading(true);
     
     try {
-      const content = await storage.getDPPFileContent(file.url);
+      const content = await storage.getDPPContent(file.url);
       setFileContent(content);
     } catch (error) {
       console.error('Error loading file content:', error);
@@ -58,7 +58,7 @@ const DPPList = ({ files, onFilesChanged }: DPPListProps) => {
 
   const handleDownloadFile = async (file: DPPFile) => {
     try {
-      const content = await storage.getDPPFileContent(file.url);
+      const content = await storage.getDPPContent(file.url);
       const blob = new Blob([content], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
       
@@ -92,7 +92,7 @@ const DPPList = ({ files, onFilesChanged }: DPPListProps) => {
     setIsDeleting(file.url);
     
     try {
-      await storage.deleteDPPFile(file.url);
+      await storage.deleteDPP(file.url);
       onFilesChanged();
       
       toast({
