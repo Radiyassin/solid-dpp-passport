@@ -52,11 +52,6 @@ export class SolidAuthService {
   getProviders() {
     return [
       {
-        name: "Inrupt PodSpaces",
-        url: "https://login.inrupt.com",
-        description: "Official Inrupt Pod provider"
-      },
-      {
         name: "SolidCommunity.net",
         url: "https://solidcommunity.net",
         description: "Community-run Pod provider"
