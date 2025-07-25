@@ -16,10 +16,12 @@ import {
   Trash2,
   Shield,
   Clock,
-  Database
+  Database,
+  Folder
 } from 'lucide-react';
 import DPPUpload from './DPPUpload';
 import DPPList from './DPPList';
+import DataspacesDemo from './DataspacesDemo';
 
 interface DPPDashboardProps {
   onLogout: () => void;
@@ -112,10 +114,14 @@ const DPPDashboard = ({ onLogout }: DPPDashboardProps) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-96">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Database className="w-4 h-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="dataspaces" className="flex items-center gap-2">
+              <Folder className="w-4 h-4" />
+              Dataspaces
             </TabsTrigger>
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
@@ -206,6 +212,10 @@ const DPPDashboard = ({ onLogout }: DPPDashboardProps) => {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="dataspaces">
+            <DataspacesDemo />
           </TabsContent>
 
           <TabsContent value="upload">
