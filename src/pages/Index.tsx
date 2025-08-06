@@ -4,7 +4,7 @@ import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Settings } from 'lucide-react';
+import { Settings, Database } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -54,7 +54,13 @@ const Index = () => {
 
   return (
     <div className="relative">
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Link to="/dataspaces">
+          <Button variant="outline" size="sm">
+            <Database className="w-4 h-4 mr-2" />
+            Data Spaces
+          </Button>
+        </Link>
         <Link to="/admin">
           <Button variant="outline" size="sm">
             <Settings className="w-4 h-4 mr-2" />
