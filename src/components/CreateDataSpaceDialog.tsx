@@ -65,6 +65,7 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
     setIsLoading(true);
     
     try {
+      console.log('Attempting to create DataSpace...');
       await dataSpaceService.createDataSpace({
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -72,6 +73,8 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         accessMode: formData.accessMode,
         storageLocation: formData.storageLocation.trim() || undefined,
       });
+      
+      console.log('DataSpace created successfully');
       
       // Reset form
       setFormData({
@@ -82,12 +85,32 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         storageLocation: '',
       });
       
+      toast({
+        title: 'Success',
+        description: 'Data Space created successfully!',
+      });
+      
       onSuccess();
     } catch (error) {
       console.error('Error creating data space:', error);
+      
+      let errorMessage = 'Failed to create Data Space. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('not authenticated')) {
+          errorMessage = 'You are not authenticated. Please log in again.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'You do not have permission to create Data Spaces in your Pod.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
       toast({
-        title: 'Error',
-        description: 'Failed to create Data Space. Please try again.',
+        title: 'Error Creating Data Space',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

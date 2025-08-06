@@ -94,40 +94,52 @@ export class DataSpaceService {
     const webId = this.auth.getWebId();
     if (!webId) throw new Error('User not authenticated');
 
+    console.log('Creating DataSpace with input:', input);
+    console.log('User WebID:', webId);
+
     const id = `ds-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const dataSpaceUrl = this.getDataSpaceUrl(id);
     
-    // Create the DataSpace thing
-    let dataset = createSolidDataset();
-    let dataSpaceThing = createThing({ name: id });
+    console.log('DataSpace URL:', dataSpaceUrl);
 
-    // Add DataSpace properties
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, RDF.type, DS.DataSpace);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.title, input.title);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.description, input.description);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.purpose, input.purpose);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.accessMode, input.accessMode);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.storageLocation, input.storageLocation || `${this.getDataSpacesContainerUrl()}${id}/`);
-    dataSpaceThing = addDatetime(dataSpaceThing, DCTERMS.created, new Date());
-    dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, true);
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.creator, webId);
+    try {
+      // Create the DataSpace thing
+      let dataset = createSolidDataset();
+      let dataSpaceThing = createThing({ name: id });
 
-    dataset = setThing(dataset, dataSpaceThing);
+      // Add DataSpace properties
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, RDF.type, DS.DataSpace);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.title, input.title);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.description, input.description);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.purpose, input.purpose);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.accessMode, input.accessMode);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.storageLocation, input.storageLocation || `${this.getDataSpacesContainerUrl()}${id}/`);
+      dataSpaceThing = addDatetime(dataSpaceThing, DCTERMS.created, new Date());
+      dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, true);
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.creator, webId);
 
-    // Add creator as admin member
-    let memberThing = createThing({ name: `member-${Date.now()}` });
-    memberThing = addStringNoLocale(memberThing, RDF.type, DS.Member);
-    memberThing = addStringNoLocale(memberThing, DS.memberWebId, webId);
-    memberThing = addStringNoLocale(memberThing, DS.memberRole, 'admin');
-    memberThing = addDatetime(memberThing, DS.joinedAt, new Date());
-    
-    dataset = setThing(dataset, memberThing);
+      dataset = setThing(dataset, dataSpaceThing);
 
-    // Save to Pod
-    const fetch = this.auth.getFetch();
-    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+      // Add creator as admin member
+      let memberThing = createThing({ name: `member-${Date.now()}` });
+      memberThing = addStringNoLocale(memberThing, RDF.type, DS.Member);
+      memberThing = addStringNoLocale(memberThing, DS.memberWebId, webId);
+      memberThing = addStringNoLocale(memberThing, DS.memberRole, 'admin');
+      memberThing = addDatetime(memberThing, DS.joinedAt, new Date());
+      
+      dataset = setThing(dataset, memberThing);
 
-    return this.parseDataSpace(id, dataset);
+      // Save to Pod
+      const fetch = this.auth.getFetch();
+      console.log('Saving DataSpace to Pod...');
+      await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+      console.log('DataSpace saved successfully');
+
+      return this.parseDataSpace(id, dataset);
+    } catch (error) {
+      console.error('Error creating DataSpace:', error);
+      throw error;
+    }
   }
 
   async listDataSpaces(): Promise<DataSpace[]> {
@@ -135,11 +147,38 @@ export class DataSpaceService {
     const fetch = this.auth.getFetch();
     
     try {
-      const dataset = await getSolidDataset(containerUrl, { fetch });
+      // Try to get the container, if it doesn't exist, return empty array
+      let dataset;
+      try {
+        dataset = await getSolidDataset(containerUrl, { fetch });
+      } catch (containerError) {
+        console.log('DataSpaces container does not exist yet, returning empty list');
+        return [];
+      }
+
       const dataSpaces: DataSpace[] = [];
+      const things = getThingAll(dataset);
       
-      // For now, we'll iterate through known DataSpace files
-      // In a full implementation, you'd list the container contents
+      // Find all DataSpace things in the container
+      for (const thing of things) {
+        const type = getStringNoLocale(thing, RDF.type);
+        if (type === DS.DataSpace) {
+          try {
+            // Extract ID from the thing URL - use thing.url instead of getSourceUrl
+            const thingUrl = thing.url;
+            const id = thingUrl?.split('#')[1] || thingUrl?.split('/').pop()?.replace('.ttl', '') || '';
+            if (id) {
+              const dataSpace = this.parseDataSpace(id, dataset);
+              if (dataSpace.isActive) {
+                dataSpaces.push(dataSpace);
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing dataspace:', parseError);
+          }
+        }
+      }
+      
       return dataSpaces;
     } catch (error) {
       console.error('Error listing data spaces:', error);
