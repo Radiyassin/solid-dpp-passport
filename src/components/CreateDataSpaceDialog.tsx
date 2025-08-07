@@ -43,8 +43,11 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('=== FORM SUBMISSION STARTED ===');
+    console.log('Form data:', formData);
     
     if (!formData.title.trim()) {
+      console.log('Validation failed: No title');
       toast({
         title: 'Error',
         description: 'Please enter a title for your Data Space',
@@ -54,6 +57,7 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
     }
 
     if (!formData.description.trim()) {
+      console.log('Validation failed: No description');
       toast({
         title: 'Error',
         description: 'Please enter a description for your Data Space',
@@ -62,21 +66,25 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
       return;
     }
 
+    console.log('Form validation passed, setting loading state...');
     setIsLoading(true);
     
     try {
-      console.log('Attempting to create DataSpace...');
-      await dataSpaceService.createDataSpace({
+      console.log('Calling dataSpaceService.createDataSpace...');
+      const createInput = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         purpose: formData.purpose.trim() || 'General collaboration',
         accessMode: formData.accessMode,
         storageLocation: formData.storageLocation.trim() || undefined,
-      });
+      };
+      console.log('Create input:', createInput);
       
-      console.log('DataSpace created successfully');
+      const result = await dataSpaceService.createDataSpace(createInput);
+      console.log('✅ DataSpace creation returned:', result);
       
       // Reset form
+      console.log('Resetting form...');
       setFormData({
         title: '',
         description: '',
@@ -85,18 +93,26 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         storageLocation: '',
       });
       
+      console.log('Showing success toast...');
       toast({
         title: 'Success',
         description: 'Data Space created successfully!',
       });
       
+      console.log('Calling onSuccess callback...');
       onSuccess();
+      console.log('✅ Form submission completed successfully');
     } catch (error) {
-      console.error('Error creating data space:', error);
+      console.error('❌ FORM SUBMISSION ERROR:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       let errorMessage = 'Failed to create Data Space. Please try again.';
       
       if (error instanceof Error) {
+        console.log('Processing error message:', error.message);
         if (error.message.includes('not authenticated')) {
           errorMessage = 'You are not authenticated. Please log in again.';
         } else if (error.message.includes('permission')) {
@@ -108,12 +124,14 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         }
       }
       
+      console.log('Showing error toast with message:', errorMessage);
       toast({
         title: 'Error Creating Data Space',
         description: errorMessage,
         variant: 'destructive',
       });
     } finally {
+      console.log('Setting loading state to false...');
       setIsLoading(false);
     }
   };

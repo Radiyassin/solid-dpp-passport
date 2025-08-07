@@ -91,23 +91,32 @@ export class DataSpaceService {
   }
 
   async createDataSpace(input: CreateDataSpaceInput): Promise<DataSpace> {
+    console.log('=== STARTING DATASPACE CREATION ===');
+    console.log('Input received:', input);
+    
     const webId = this.auth.getWebId();
-    if (!webId) throw new Error('User not authenticated');
-
-    console.log('Creating DataSpace with input:', input);
-    console.log('User WebID:', webId);
+    console.log('WebID:', webId);
+    
+    if (!webId) {
+      console.error('User not authenticated - no WebID found');
+      throw new Error('User not authenticated');
+    }
 
     const id = `ds-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const dataSpaceUrl = this.getDataSpaceUrl(id);
+    console.log('Generated DataSpace ID:', id);
     
-    console.log('DataSpace URL:', dataSpaceUrl);
+    const dataSpaceUrl = this.getDataSpaceUrl(id);
+    console.log('DataSpace URL will be:', dataSpaceUrl);
 
     try {
+      console.log('Creating Solid dataset...');
       // Create the DataSpace thing
       let dataset = createSolidDataset();
       let dataSpaceThing = createThing({ name: id });
+      console.log('Created dataset and thing');
 
       // Add DataSpace properties
+      console.log('Adding DataSpace properties...');
       dataSpaceThing = addStringNoLocale(dataSpaceThing, RDF.type, DS.DataSpace);
       dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.title, input.title);
       dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.description, input.description);
@@ -117,10 +126,13 @@ export class DataSpaceService {
       dataSpaceThing = addDatetime(dataSpaceThing, DCTERMS.created, new Date());
       dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, true);
       dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.creator, webId);
+      console.log('Properties added to DataSpace thing');
 
       dataset = setThing(dataset, dataSpaceThing);
+      console.log('DataSpace thing added to dataset');
 
       // Add creator as admin member
+      console.log('Creating admin member...');
       let memberThing = createThing({ name: `member-${Date.now()}` });
       memberThing = addStringNoLocale(memberThing, RDF.type, DS.Member);
       memberThing = addStringNoLocale(memberThing, DS.memberWebId, webId);
@@ -128,17 +140,40 @@ export class DataSpaceService {
       memberThing = addDatetime(memberThing, DS.joinedAt, new Date());
       
       dataset = setThing(dataset, memberThing);
+      console.log('Admin member added to dataset');
 
       // Save to Pod
       const fetch = this.auth.getFetch();
-      console.log('Saving DataSpace to Pod...');
+      console.log('Getting fetch function for authentication...');
+      
+      if (!fetch) {
+        console.error('No authenticated fetch function available');
+        throw new Error('No authenticated fetch function available');
+      }
+      
+      console.log('Attempting to save dataset to Pod at:', dataSpaceUrl);
       await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
-      console.log('DataSpace saved successfully');
+      console.log('✅ DataSpace saved successfully to Pod!');
 
-      return this.parseDataSpace(id, dataset);
+      const result = this.parseDataSpace(id, dataset);
+      console.log('✅ DataSpace creation completed successfully:', result);
+      return result;
     } catch (error) {
-      console.error('Error creating DataSpace:', error);
-      throw error;
+      console.error('❌ DETAILED ERROR creating DataSpace:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        dataSpaceUrl,
+        webId,
+        input
+      });
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to create DataSpace: ${error.message}`);
+      } else {
+        throw new Error('Failed to create DataSpace: Unknown error occurred');
+      }
     }
   }
 
