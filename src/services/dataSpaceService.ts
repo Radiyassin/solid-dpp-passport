@@ -182,43 +182,101 @@ export class DataSpaceService {
     const fetch = this.auth.getFetch();
     
     try {
-      // Try to get the container, if it doesn't exist, return empty array
-      let dataset;
+      console.log('🔍 Loading dataspaces from container:', containerUrl);
+      
+      // Try to get the container to find dataspace files
+      let containerDataset;
       try {
-        dataset = await getSolidDataset(containerUrl, { fetch });
+        containerDataset = await getSolidDataset(containerUrl, { fetch });
       } catch (containerError) {
         console.log('DataSpaces container does not exist yet, returning empty list');
         return [];
       }
 
       const dataSpaces: DataSpace[] = [];
-      const things = getThingAll(dataset);
+      const containerThings = getThingAll(containerDataset);
       
-      // Find all DataSpace things in the container
-      for (const thing of things) {
-        const type = getStringNoLocale(thing, RDF.type);
-        if (type === DS.DataSpace) {
+      console.log('📁 Found container things:', containerThings.length);
+      
+      // Look for references to dataspace files in the container
+      // Since each dataspace is in its own .ttl file, we need to find and read each file
+      for (const thing of containerThings) {
+        const thingUrl = thing.url;
+        console.log('🔍 Checking thing:', thingUrl);
+        
+        // Check if this is a dataspace file (.ttl)
+        if (thingUrl && thingUrl.endsWith('.ttl') && thingUrl.includes('/dataspaces/')) {
           try {
-            // Extract ID from the thing URL - use thing.url instead of getSourceUrl
-            const thingUrl = thing.url;
-            const id = thingUrl?.split('#')[1] || thingUrl?.split('/').pop()?.replace('.ttl', '') || '';
+            console.log('📖 Reading dataspace file:', thingUrl);
+            const dataSpaceDataset = await getSolidDataset(thingUrl, { fetch });
+            
+            // Extract ID from filename
+            const id = thingUrl.split('/').pop()?.replace('.ttl', '') || '';
+            console.log('🆔 Extracted ID:', id);
+            
             if (id) {
-              const dataSpace = this.parseDataSpace(id, dataset);
+              const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+              console.log('✅ Parsed dataspace:', dataSpace.title, 'active:', dataSpace.isActive);
+              
               if (dataSpace.isActive) {
                 dataSpaces.push(dataSpace);
               }
             }
           } catch (parseError) {
-            console.error('Error parsing dataspace:', parseError);
+            console.error('❌ Error parsing dataspace file:', thingUrl, parseError);
           }
         }
       }
       
+      // Fallback: If no dataspaces found via container, try direct discovery
+      if (dataSpaces.length === 0) {
+        console.log('🔄 No dataspaces found via container, trying direct discovery...');
+        
+        // Try to discover dataspaces by checking known patterns
+        // This is a fallback for when container indexing doesn't work properly
+        const testIds = await this.discoverDataSpaceIds();
+        for (const id of testIds) {
+          try {
+            const dataSpace = await this.getDataSpace(id);
+            if (dataSpace && dataSpace.isActive) {
+              dataSpaces.push(dataSpace);
+            }
+          } catch (error) {
+            // Ignore errors for non-existent dataspaces
+          }
+        }
+      }
+      
+      console.log('📋 Final dataspaces list:', dataSpaces.length, 'found');
       return dataSpaces;
     } catch (error) {
-      console.error('Error listing data spaces:', error);
+      console.error('❌ Error listing data spaces:', error);
       return [];
     }
+  }
+
+  private async discoverDataSpaceIds(): Promise<string[]> {
+    // This method tries to discover existing dataspace IDs
+    // by checking common patterns or using container listings
+    const containerUrl = this.getDataSpacesContainerUrl();
+    const fetch = this.auth.getFetch();
+    
+    try {
+      const response = await fetch(containerUrl, {
+        headers: { 'Accept': 'text/turtle' }
+      });
+      
+      if (response.ok) {
+        const content = await response.text();
+        // Extract .ttl file references from the container content
+        const fileMatches = content.match(/ds-\d+-\w+\.ttl/g) || [];
+        return fileMatches.map(filename => filename.replace('.ttl', ''));
+      }
+    } catch (error) {
+      console.log('Could not discover dataspace IDs:', error);
+    }
+    
+    return [];
   }
 
   async getDataSpace(id: string): Promise<DataSpace | null> {
