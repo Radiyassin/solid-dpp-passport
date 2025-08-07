@@ -112,7 +112,7 @@ export class DataSpaceService {
       console.log('Creating Solid dataset...');
       // Create the DataSpace thing
       let dataset = createSolidDataset();
-      let dataSpaceThing = createThing({ name: id });
+      let dataSpaceThing = createThing({ url: `${dataSpaceUrl}#${id}` });
       console.log('Created dataset and thing');
 
       // Add DataSpace properties
@@ -133,7 +133,7 @@ export class DataSpaceService {
 
       // Add creator as admin member
       console.log('Creating admin member...');
-      let memberThing = createThing({ name: `member-${Date.now()}` });
+      let memberThing = createThing({ url: `${dataSpaceUrl}#member-${Date.now()}` });
       memberThing = addStringNoLocale(memberThing, RDF.type, DS.Member);
       memberThing = addStringNoLocale(memberThing, DS.memberWebId, webId);
       memberThing = addStringNoLocale(memberThing, DS.memberRole, 'admin');
@@ -336,8 +336,9 @@ export class DataSpaceService {
   }
 
   private parseDataSpace(id: string, dataset: any): DataSpace {
+    const dataSpaceUrl = this.getDataSpaceUrl(id);
     // Try different ways to get the DataSpace thing
-    let dataSpaceThing = getThing(dataset, `#${id}`);
+    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${id}`);
     
     if (!dataSpaceThing) {
       // Fallback: look for any thing with DataSpace type
