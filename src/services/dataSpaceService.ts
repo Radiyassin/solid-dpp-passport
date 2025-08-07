@@ -336,10 +336,19 @@ export class DataSpaceService {
   }
 
   private parseDataSpace(id: string, dataset: any): DataSpace {
-    const dataSpaceUrl = this.getDataSpaceUrl(id);
-    const dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${id}`);
+    // Try different ways to get the DataSpace thing
+    let dataSpaceThing = getThing(dataset, `#${id}`);
     
     if (!dataSpaceThing) {
+      // Fallback: look for any thing with DataSpace type
+      const things = getThingAll(dataset);
+      dataSpaceThing = things.find(thing => 
+        getStringNoLocale(thing, RDF.type) === DS.DataSpace
+      );
+    }
+    
+    if (!dataSpaceThing) {
+      console.error('DataSpace not found in dataset. Available things:', getThingAll(dataset).map(t => ({ url: t.url, type: getStringNoLocale(t, RDF.type) })));
       throw new Error('DataSpace not found in dataset');
     }
 
