@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Home, Settings, Database } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const DataSpaces = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -65,6 +66,7 @@ const DataSpaces = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <NotificationCenter />
               <Link to="/">
                 <Button variant="outline" size="sm">
                   <Home className="w-4 h-4 mr-2" />

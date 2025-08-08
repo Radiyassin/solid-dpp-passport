@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Settings, Database } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -55,6 +56,7 @@ const Index = () => {
   return (
     <div className="relative">
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <NotificationCenter />
         <Link to="/dataspaces">
           <Button variant="outline" size="sm">
             <Database className="w-4 h-4 mr-2" />

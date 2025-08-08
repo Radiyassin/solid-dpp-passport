@@ -342,6 +342,25 @@ export class DataSpaceService {
   }
 
   async addMember(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {
+    // Instead of directly adding the member, send an invitation
+    const dataSpace = await this.getDataSpace(dataSpaceId);
+    if (!dataSpace) {
+      throw new Error('DataSpace not found');
+    }
+
+    const { NotificationService } = await import('./notificationService');
+    const notificationService = NotificationService.getInstance();
+    
+    await notificationService.sendDataSpaceInvitation(
+      memberWebId,
+      dataSpaceId,
+      dataSpace.title,
+      role
+    );
+  }
+
+  async addMemberDirectly(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {
+    // This method directly adds a member (used when accepting invitations)
     const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
     const fetch = this.auth.getFetch();
     
@@ -357,7 +376,7 @@ export class DataSpaceService {
     dataset = setThing(dataset, memberThing);
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
 
-    // Also store a reference in the member's pod so they can discover this data space
+    // Store reference in member's pod if it's the current user
     await this.storeSharedDataSpaceReference(memberWebId, dataSpaceId, dataSpaceUrl);
   }
 
