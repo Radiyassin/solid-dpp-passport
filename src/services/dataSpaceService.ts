@@ -90,14 +90,6 @@ export class DataSpaceService {
     return `${this.getDataSpacesContainerUrl()}${id}.ttl`;
   }
 
-  private getSharedDataSpacesUrl(): string {
-    const webId = this.auth.getWebId();
-    if (!webId) throw new Error('User not authenticated');
-    
-    const baseUrl = webId.split('/profile')[0];
-    return `${baseUrl}/shared-dataspaces.ttl`;
-  }
-
   async createDataSpace(input: CreateDataSpaceInput): Promise<DataSpace> {
     console.log('=== STARTING DATASPACE CREATION ===');
     console.log('Input received:', input);
@@ -192,75 +184,65 @@ export class DataSpaceService {
     try {
       console.log('🔍 Loading dataspaces from container:', containerUrl);
       
-      const dataSpaces: DataSpace[] = [];
-      const dataSpaceIds = new Set<string>(); // Track IDs to avoid duplicates
-      
-      // 1. Load data spaces owned by the current user
+      // Try to get the container to find dataspace files
       let containerDataset;
       try {
         containerDataset = await getSolidDataset(containerUrl, { fetch });
-        const containerThings = getThingAll(containerDataset);
-        
-        console.log('📁 Found container things:', containerThings.length);
-        
-        // Look for references to dataspace files in the container
-        for (const thing of containerThings) {
-          const thingUrl = thing.url;
-          console.log('🔍 Checking thing:', thingUrl);
-          
-          // Check if this is a dataspace file (.ttl)
-          if (thingUrl && thingUrl.endsWith('.ttl') && thingUrl.includes('/dataspaces/')) {
-            try {
-              console.log('📖 Reading dataspace file:', thingUrl);
-              const dataSpaceDataset = await getSolidDataset(thingUrl, { fetch });
-              
-              // Extract ID from filename
-              const id = thingUrl.split('/').pop()?.replace('.ttl', '') || '';
-              console.log('🆔 Extracted ID:', id);
-              
-              if (id && !dataSpaceIds.has(id)) {
-                const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
-                console.log('✅ Parsed owned dataspace:', dataSpace.title, 'active:', dataSpace.isActive);
-                
-                if (dataSpace.isActive) {
-                  dataSpaces.push(dataSpace);
-                  dataSpaceIds.add(id);
-                }
-              }
-            } catch (parseError) {
-              console.error('❌ Error parsing dataspace file:', thingUrl, parseError);
-            }
-          }
-        }
       } catch (containerError) {
-        console.log('DataSpaces container does not exist yet for owned spaces');
+        console.log('DataSpaces container does not exist yet, returning empty list');
+        return [];
       }
 
-      // 2. Load shared data spaces where the user is a member
-      const sharedDataSpaces = await this.getSharedDataSpaces();
-      for (const sharedSpace of sharedDataSpaces) {
-        if (!dataSpaceIds.has(sharedSpace.id) && sharedSpace.isActive) {
-          dataSpaces.push(sharedSpace);
-          dataSpaceIds.add(sharedSpace.id);
+      const dataSpaces: DataSpace[] = [];
+      const containerThings = getThingAll(containerDataset);
+      
+      console.log('📁 Found container things:', containerThings.length);
+      
+      // Look for references to dataspace files in the container
+      // Since each dataspace is in its own .ttl file, we need to find and read each file
+      for (const thing of containerThings) {
+        const thingUrl = thing.url;
+        console.log('🔍 Checking thing:', thingUrl);
+        
+        // Check if this is a dataspace file (.ttl)
+        if (thingUrl && thingUrl.endsWith('.ttl') && thingUrl.includes('/dataspaces/')) {
+          try {
+            console.log('📖 Reading dataspace file:', thingUrl);
+            const dataSpaceDataset = await getSolidDataset(thingUrl, { fetch });
+            
+            // Extract ID from filename
+            const id = thingUrl.split('/').pop()?.replace('.ttl', '') || '';
+            console.log('🆔 Extracted ID:', id);
+            
+            if (id) {
+              const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+              console.log('✅ Parsed dataspace:', dataSpace.title, 'active:', dataSpace.isActive);
+              
+              if (dataSpace.isActive) {
+                dataSpaces.push(dataSpace);
+              }
+            }
+          } catch (parseError) {
+            console.error('❌ Error parsing dataspace file:', thingUrl, parseError);
+          }
         }
       }
       
-      // 3. Fallback: If no dataspaces found, try direct discovery
+      // Fallback: If no dataspaces found via container, try direct discovery
       if (dataSpaces.length === 0) {
         console.log('🔄 No dataspaces found via container, trying direct discovery...');
         
+        // Try to discover dataspaces by checking known patterns
+        // This is a fallback for when container indexing doesn't work properly
         const testIds = await this.discoverDataSpaceIds();
         for (const id of testIds) {
-          if (!dataSpaceIds.has(id)) {
-            try {
-              const dataSpace = await this.getDataSpace(id);
-              if (dataSpace && dataSpace.isActive) {
-                dataSpaces.push(dataSpace);
-                dataSpaceIds.add(id);
-              }
-            } catch (error) {
-              // Ignore errors for non-existent dataspaces
+          try {
+            const dataSpace = await this.getDataSpace(id);
+            if (dataSpace && dataSpace.isActive) {
+              dataSpaces.push(dataSpace);
             }
+          } catch (error) {
+            // Ignore errors for non-existent dataspaces
           }
         }
       }
@@ -342,36 +324,6 @@ export class DataSpaceService {
   }
 
   async addMember(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {
-    // For demo purposes, directly add the member and create a demonstration notification
-    try {
-      // First, add the member directly to the dataspace
-      await this.addMemberDirectly(dataSpaceId, memberWebId, role);
-      
-      // Then create a demo notification for testing purposes
-      const dataSpace = await this.getDataSpace(dataSpaceId);
-      if (dataSpace) {
-        const { NotificationService } = await import('./notificationService');
-        const notificationService = NotificationService.getInstance();
-        
-        // This creates a demo notification that shows up in the current user's notification center
-        // In a real implementation, this would send notifications to the actual recipient
-        await notificationService.sendDataSpaceInvitation(
-          memberWebId,
-          dataSpaceId,
-          dataSpace.title,
-          role
-        );
-      }
-      
-      console.log(`✅ Member ${memberWebId} added to dataspace and notification sent`);
-    } catch (error) {
-      console.error('Error adding member:', error);
-      throw error;
-    }
-  }
-
-  async addMemberDirectly(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {
-    // This method directly adds a member (used when accepting invitations)
     const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
     const fetch = this.auth.getFetch();
     
@@ -386,9 +338,6 @@ export class DataSpaceService {
     
     dataset = setThing(dataset, memberThing);
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
-
-    // Store reference in member's pod if it's the current user
-    await this.storeSharedDataSpaceReference(memberWebId, dataSpaceId, dataSpaceUrl);
   }
 
   async removeMember(dataSpaceId: string, memberWebId: string): Promise<void> {
@@ -485,85 +434,5 @@ export class DataSpaceService {
       creatorWebId: getStringNoLocale(dataSpaceThing, DCTERMS.creator) || '',
       members,
     };
-  }
-
-  private async storeSharedDataSpaceReference(memberWebId: string, dataSpaceId: string, dataSpaceUrl: string): Promise<void> {
-    try {
-      // For demonstration purposes, we'll try to store a reference in the current user's pod
-      // In a real implementation, you'd need proper Solid ACL permissions to write to another user's pod
-      
-      const fetch = this.auth.getFetch();
-      const currentWebId = this.auth.getWebId();
-      
-      // Only store reference if we're trying to add the current user as a member
-      if (memberWebId === currentWebId) {
-        const sharedUrl = this.getSharedDataSpacesUrl();
-        
-        let sharedDataset;
-        try {
-          sharedDataset = await getSolidDataset(sharedUrl, { fetch });
-        } catch (error) {
-          // Create new dataset if it doesn't exist
-          sharedDataset = createSolidDataset();
-        }
-        
-        // Create a reference thing
-        let referenceThing = createThing({ name: `ref-${dataSpaceId}` });
-        referenceThing = addStringNoLocale(referenceThing, DCTERMS.identifier, dataSpaceId);
-        referenceThing = addStringNoLocale(referenceThing, DS.storageLocation, dataSpaceUrl);
-        referenceThing = addDatetime(referenceThing, DCTERMS.created, new Date());
-        
-        sharedDataset = setThing(sharedDataset, referenceThing);
-        await saveSolidDatasetAt(sharedUrl, sharedDataset, { fetch });
-        
-        console.log(`✅ Stored shared dataspace reference for ${dataSpaceId}`);
-      } else {
-        console.log(`ℹ️ Cannot store reference in ${memberWebId}'s pod - would need proper ACL permissions`);
-      }
-    } catch (error) {
-      console.error('Error storing shared dataspace reference:', error);
-    }
-  }
-
-  private async getSharedDataSpaces(): Promise<DataSpace[]> {
-    const webId = this.auth.getWebId();
-    if (!webId) return [];
-
-    const dataSpaces: DataSpace[] = [];
-    const fetch = this.auth.getFetch();
-    
-    try {
-      // Check if the user has a shared-dataspaces reference file
-      const sharedUrl = this.getSharedDataSpacesUrl();
-      const sharedDataset = await getSolidDataset(sharedUrl, { fetch });
-      
-      // Extract dataspace references from the shared file
-      const sharedThings = getThingAll(sharedDataset);
-      
-      for (const thing of sharedThings) {
-        const dataSpaceUrl = getStringNoLocale(thing, DS.storageLocation);
-        const dataSpaceId = getStringNoLocale(thing, DCTERMS.identifier);
-        
-        if (dataSpaceUrl && dataSpaceId) {
-          try {
-            // Try to access the shared dataspace
-            const dataSpaceDataset = await getSolidDataset(dataSpaceUrl, { fetch });
-            const dataSpace = this.parseDataSpace(dataSpaceId, dataSpaceDataset);
-            
-            // Verify the user is actually a member
-            const isMember = dataSpace.members.some(member => member.webId === webId);
-            if (isMember && dataSpace.isActive) {
-              dataSpaces.push(dataSpace);
-            }
-          } catch (error) {
-            console.log(`Could not access shared dataspace ${dataSpaceId}:`, error);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('No shared dataspaces file found or error reading it:', error);
-    }
-    
-    return dataSpaces;
   }
 }
