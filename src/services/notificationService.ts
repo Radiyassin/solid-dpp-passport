@@ -100,7 +100,7 @@ export class NotificationService {
       dataset = setThing(dataset, invitationThing);
       
       // For demo purposes, we'll store in current user's notifications
-      // In real implementation, you'd need proper ACL permissions
+      // In real implementation, you'd need proper ACL permissions to write to recipient's pod
       const currentUserNotificationsUrl = this.getNotificationsUrl();
       await saveSolidDatasetAt(currentUserNotificationsUrl, dataset, { fetch });
       

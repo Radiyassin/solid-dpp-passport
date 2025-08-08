@@ -342,21 +342,32 @@ export class DataSpaceService {
   }
 
   async addMember(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {
-    // Instead of directly adding the member, send an invitation
-    const dataSpace = await this.getDataSpace(dataSpaceId);
-    if (!dataSpace) {
-      throw new Error('DataSpace not found');
+    // For demo purposes, directly add the member and create a demonstration notification
+    try {
+      // First, add the member directly to the dataspace
+      await this.addMemberDirectly(dataSpaceId, memberWebId, role);
+      
+      // Then create a demo notification for testing purposes
+      const dataSpace = await this.getDataSpace(dataSpaceId);
+      if (dataSpace) {
+        const { NotificationService } = await import('./notificationService');
+        const notificationService = NotificationService.getInstance();
+        
+        // This creates a demo notification that shows up in the current user's notification center
+        // In a real implementation, this would send notifications to the actual recipient
+        await notificationService.sendDataSpaceInvitation(
+          memberWebId,
+          dataSpaceId,
+          dataSpace.title,
+          role
+        );
+      }
+      
+      console.log(`✅ Member ${memberWebId} added to dataspace and notification sent`);
+    } catch (error) {
+      console.error('Error adding member:', error);
+      throw error;
     }
-
-    const { NotificationService } = await import('./notificationService');
-    const notificationService = NotificationService.getInstance();
-    
-    await notificationService.sendDataSpaceInvitation(
-      memberWebId,
-      dataSpaceId,
-      dataSpace.title,
-      role
-    );
   }
 
   async addMemberDirectly(dataSpaceId: string, memberWebId: string, role: DataSpaceRole): Promise<void> {

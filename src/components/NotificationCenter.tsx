@@ -19,7 +19,9 @@ export const NotificationCenter: React.FC = () => {
   const loadInvitations = async () => {
     setIsLoading(true);
     try {
+      console.log('🔔 Loading invitations...');
       const data = await notificationService.getInvitations();
+      console.log('🔔 Loaded invitations:', data.length, 'found');
       setInvitations(data);
     } catch (error) {
       console.error('Error loading invitations:', error);
