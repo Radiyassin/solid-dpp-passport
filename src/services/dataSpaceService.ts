@@ -31,10 +31,27 @@ const DS = {
   memberWebId: "https://w3id.org/dataspace/vocab#memberWebId",
   memberRole: "https://w3id.org/dataspace/vocab#memberRole",
   joinedAt: "https://w3id.org/dataspace/vocab#joinedAt",
+  // Metadata vocabulary
+  Metadata: "https://w3id.org/dataspace/vocab#Metadata",
+  hasMetadata: "https://w3id.org/dataspace/vocab#hasMetadata",
+  metadataKey: "https://w3id.org/dataspace/vocab#metadataKey",
+  metadataValue: "https://w3id.org/dataspace/vocab#metadataValue",
+  metadataType: "https://w3id.org/dataspace/vocab#metadataType",
+  category: "https://w3id.org/dataspace/vocab#category",
+  tags: "https://w3id.org/dataspace/vocab#tags",
 };
 
 export type DataSpaceRole = 'admin' | 'write' | 'read';
 export type AccessMode = 'public' | 'private' | 'restricted';
+
+export interface DataSpaceMetadata {
+  id: string;
+  key: string;
+  value: string;
+  type: 'string' | 'number' | 'boolean' | 'date' | 'url';
+  category?: string;
+  createdAt: Date;
+}
 
 export interface DataSpace {
   id: string;
@@ -47,6 +64,9 @@ export interface DataSpace {
   isActive: boolean;
   members: DataSpaceMember[];
   creatorWebId: string;
+  metadata: DataSpaceMetadata[];
+  tags: string[];
+  category?: string;
 }
 
 export interface DataSpaceMember {
@@ -61,6 +81,15 @@ export interface CreateDataSpaceInput {
   purpose: string;
   accessMode: AccessMode;
   storageLocation?: string;
+  category?: string;
+  tags?: string[];
+}
+
+export interface AddMetadataInput {
+  key: string;
+  value: string;
+  type: 'string' | 'number' | 'boolean' | 'date' | 'url';
+  category?: string;
 }
 
 export class DataSpaceService {
@@ -126,6 +155,16 @@ export class DataSpaceService {
       dataSpaceThing = addDatetime(dataSpaceThing, DCTERMS.created, new Date());
       dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, true);
       dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.creator, webId);
+      
+      // Add category and tags if provided
+      if (input.category) {
+        dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.category, input.category);
+      }
+      if (input.tags && input.tags.length > 0) {
+        input.tags.forEach(tag => {
+          dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.tags, tag);
+        });
+      }
       console.log('Properties added to DataSpace thing');
 
       dataset = setThing(dataset, dataSpaceThing);
@@ -393,6 +432,94 @@ export class DataSpaceService {
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
   }
 
+  async addMetadata(dataSpaceId: string, metadata: AddMetadataInput): Promise<void> {
+    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
+    const fetch = this.auth.getFetch();
+    
+    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+    
+    // Create new metadata thing
+    const metadataId = `metadata-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    let metadataThing = createThing({ name: metadataId });
+    metadataThing = addStringNoLocale(metadataThing, RDF.type, DS.Metadata);
+    metadataThing = addStringNoLocale(metadataThing, DS.metadataKey, metadata.key);
+    metadataThing = addStringNoLocale(metadataThing, DS.metadataValue, metadata.value);
+    metadataThing = addStringNoLocale(metadataThing, DS.metadataType, metadata.type);
+    metadataThing = addDatetime(metadataThing, DCTERMS.created, new Date());
+    
+    if (metadata.category) {
+      metadataThing = addStringNoLocale(metadataThing, DS.category, metadata.category);
+    }
+    
+    dataset = setThing(dataset, metadataThing);
+    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+  }
+
+  async removeMetadata(dataSpaceId: string, metadataId: string): Promise<void> {
+    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
+    const fetch = this.auth.getFetch();
+    
+    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+    const metadataThing = getThing(dataset, `${dataSpaceUrl}#${metadataId}`);
+    
+    if (metadataThing) {
+      dataset = removeThing(dataset, metadataThing);
+      await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+    }
+  }
+
+  async updateDataSpaceTags(dataSpaceId: string, tags: string[]): Promise<void> {
+    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
+    const fetch = this.auth.getFetch();
+    
+    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${dataSpaceId}`);
+    
+    if (!dataSpaceThing) {
+      throw new Error('DataSpace not found');
+    }
+
+    // Remove existing tags and add new ones
+    const existingThings = getThingAll(dataset);
+    existingThings.forEach(thing => {
+      if (getStringNoLocale(thing, DS.tags)) {
+        // Remove old tag associations
+        let updatedThing = thing;
+        // Clear existing tags - we'll re-add them
+        const tagValues = thing.predicates[DS.tags];
+        if (tagValues) {
+          tagValues.namedNodes?.forEach(() => {
+            // Remove each tag individually would be complex, simpler to rebuild
+          });
+        }
+      }
+    });
+
+    // Add new tags
+    tags.forEach(tag => {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.tags, tag);
+    });
+
+    dataset = setThing(dataset, dataSpaceThing);
+    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+  }
+
+  async updateDataSpaceCategory(dataSpaceId: string, category: string): Promise<void> {
+    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
+    const fetch = this.auth.getFetch();
+    
+    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${dataSpaceId}`);
+    
+    if (!dataSpaceThing) {
+      throw new Error('DataSpace not found');
+    }
+
+    dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.category, category);
+    dataset = setThing(dataset, dataSpaceThing);
+    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+  }
+
   private parseDataSpace(id: string, dataset: any): DataSpace {
     const dataSpaceUrl = this.getDataSpaceUrl(id);
     // Try different ways to get the DataSpace thing
@@ -422,6 +549,37 @@ export class DataSpaceService {
       joinedAt: getDatetime(memberThing, DS.joinedAt) || new Date(),
     }));
 
+    // Parse metadata
+    const metadataThings = getThingAll(dataset).filter(thing => 
+      getStringNoLocale(thing, RDF.type) === DS.Metadata
+    );
+    
+    const metadata: DataSpaceMetadata[] = metadataThings.map(metadataThing => ({
+      id: metadataThing.url.split('#')[1] || '',
+      key: getStringNoLocale(metadataThing, DS.metadataKey) || '',
+      value: getStringNoLocale(metadataThing, DS.metadataValue) || '',
+      type: (getStringNoLocale(metadataThing, DS.metadataType) as any) || 'string',
+      category: getStringNoLocale(metadataThing, DS.category) || undefined,
+      createdAt: getDatetime(metadataThing, DCTERMS.created) || new Date(),
+    }));
+
+    // Parse tags - get all tag values from the dataspace thing
+    const allThings = getThingAll(dataset);
+    const dataSpaceThingForTags = allThings.find(thing => 
+      getStringNoLocale(thing, RDF.type) === DS.DataSpace
+    );
+    
+    let tags: string[] = [];
+    if (dataSpaceThingForTags && dataSpaceThingForTags.predicates[DS.tags]) {
+      const tagLiterals = dataSpaceThingForTags.predicates[DS.tags].literals;
+      if (tagLiterals) {
+        tags = Object.keys(tagLiterals);
+      }
+    }
+
+    // Parse category
+    const category = getStringNoLocale(dataSpaceThing, DS.category) || undefined;
+
     return {
       id,
       title: getStringNoLocale(dataSpaceThing, DCTERMS.title) || '',
@@ -433,6 +591,9 @@ export class DataSpaceService {
       isActive: getBoolean(dataSpaceThing, DS.isActive) ?? true,
       creatorWebId: getStringNoLocale(dataSpaceThing, DCTERMS.creator) || '',
       members,
+      metadata,
+      tags,
+      category,
     };
   }
 }

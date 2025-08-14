@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { DataSpaceService, AccessMode } from '@/services/dataSpaceService';
-import { Loader2, Info } from 'lucide-react';
+import { Loader2, Info, X, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 interface CreateDataSpaceDialogProps {
   open: boolean;
@@ -36,7 +37,10 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
     purpose: '',
     accessMode: 'private' as AccessMode,
     storageLocation: '',
+    category: '',
   });
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const dataSpaceService = DataSpaceService.getInstance();
@@ -77,6 +81,8 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         purpose: formData.purpose.trim() || 'General collaboration',
         accessMode: formData.accessMode,
         storageLocation: formData.storageLocation.trim() || undefined,
+        category: formData.category.trim() || undefined,
+        tags: tags.length > 0 ? tags : undefined,
       };
       console.log('Create input:', createInput);
       
@@ -91,7 +97,10 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
         purpose: '',
         accessMode: 'private',
         storageLocation: '',
+        category: '',
       });
+      setTags([]);
+      setNewTagInput('');
       
       console.log('Showing success toast...');
       toast({
@@ -138,6 +147,18 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const addTag = () => {
+    const tag = newTagInput.trim();
+    if (tag && !tags.includes(tag)) {
+      setTags([...tags, tag]);
+      setNewTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
   return (
@@ -217,6 +238,59 @@ const CreateDataSpaceDialog = ({ open, onOpenChange, onSuccess }: CreateDataSpac
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category (Optional)</Label>
+              <Input
+                id="category"
+                placeholder="e.g., Research, Manufacturing, Supply Chain"
+                value={formData.category}
+                onChange={(e) => handleInputChange('category', e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags (Optional)</Label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="tags"
+                    placeholder="Add tag"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    onClick={addTag}
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="ml-1 hover:bg-red-100 rounded-full p-0.5"
+                          disabled={isLoading}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

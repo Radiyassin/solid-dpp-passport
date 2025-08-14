@@ -53,6 +53,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataManager from './DataManager';
+import MetadataManager from './MetadataManager';
 
 interface DataSpaceDetailsProps {
   dataSpace: DataSpace;
@@ -246,10 +247,14 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger value="metadata" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Metadata
           </TabsTrigger>
           <TabsTrigger value="members" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
@@ -357,6 +362,10 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="metadata">
+          <MetadataManager dataSpace={dataSpace} onUpdate={onUpdate} />
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6">
