@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { SolidAuthService } from '@/services/solidAuth';
 import SolidLogin from '@/components/SolidLogin';
-import DataSpaceSidebar from '@/components/DataSpaceSidebar';
-import DataSpaceDashboard from '@/components/DataSpaceDashboard';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import DPPDashboard from '@/components/DPPDashboard';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Settings, Database } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -32,14 +33,13 @@ const Index = () => {
     // The actual auth state change will be handled by the redirect
   };
 
-  const handleLogout = async () => {
-    await auth.logout();
+  const handleLogout = () => {
     setIsAuthenticated(false);
   };
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-secondary flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Initializing Solid session...</p>
@@ -53,19 +53,23 @@ const Index = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <DataSpaceSidebar onLogout={handleLogout} />
-        <div className="flex-1 flex flex-col">
-          <header className="h-12 flex items-center border-b border-sidebar-border bg-card/50 backdrop-blur-sm">
-            <SidebarTrigger className="ml-4" />
-          </header>
-          <main className="flex-1 overflow-auto">
-            <DataSpaceDashboard />
-          </main>
-        </div>
+    <div className="relative">
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Link to="/dataspaces">
+          <Button variant="outline" size="sm">
+            <Database className="w-4 h-4 mr-2" />
+            Data Spaces
+          </Button>
+        </Link>
+        <Link to="/admin">
+          <Button variant="outline" size="sm">
+            <Settings className="w-4 h-4 mr-2" />
+            Admin Panel
+          </Button>
+        </Link>
       </div>
-    </SidebarProvider>
+      <DPPDashboard onLogout={handleLogout} />
+    </div>
   );
 };
 
