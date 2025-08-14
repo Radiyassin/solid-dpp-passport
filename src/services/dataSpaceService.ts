@@ -31,7 +31,10 @@ const DS = {
   memberWebId: "https://w3id.org/dataspace/vocab#memberWebId",
   memberRole: "https://w3id.org/dataspace/vocab#memberRole",
   joinedAt: "https://w3id.org/dataspace/vocab#joinedAt",
-  // Asset Metadata vocabulary
+  // Metadata vocabulary
+  Metadata: "https://w3id.org/dataspace/vocab#Metadata",
+  hasMetadata: "https://w3id.org/dataspace/vocab#hasMetadata",
+  metadataTitle: "https://w3id.org/dataspace/vocab#metadataTitle",
   assetCreated: "https://w3id.org/dataspace/vocab#assetCreated",
   assetLastModified: "https://w3id.org/dataspace/vocab#assetLastModified",
   originalTitle: "https://w3id.org/dataspace/vocab#originalTitle",
@@ -50,6 +53,7 @@ const DS = {
   resourceSize: "https://w3id.org/dataspace/vocab#resourceSize",
   resourceEncoding: "https://w3id.org/dataspace/vocab#resourceEncoding",
   datasourceLink: "https://w3id.org/dataspace/vocab#datasourceLink",
+  createdBy: "https://w3id.org/dataspace/vocab#createdBy",
   category: "https://w3id.org/dataspace/vocab#category",
   tags: "https://w3id.org/dataspace/vocab#tags",
 };
@@ -57,7 +61,10 @@ const DS = {
 export type DataSpaceRole = 'admin' | 'write' | 'read';
 export type AccessMode = 'public' | 'private' | 'restricted';
 
-export interface AssetMetadata {
+export interface DataSpaceMetadata {
+  id: string;
+  title: string;
+  // Asset Information
   assetCreated?: Date;
   assetLastModified?: Date;
   description?: string;
@@ -65,19 +72,26 @@ export interface AssetMetadata {
   openDataSourceLink?: string;
   dataFormat?: string;
   categories?: string[];
+  // Usage & Settings
   chargeable?: boolean;
   useSetting?: string;
   datasourceLanguage?: string;
   metadataLanguage?: string;
+  // Temporal Coverage
   temporalCoverageBeginning?: Date;
   temporalCoverageEnding?: Date;
   linkedMetadata?: string;
   updateFrequency?: string;
+  // Geographic Information
   geographicCoverage?: string;
   geographicExpansion?: string;
+  // Resource Information
   resourceSize?: string;
   resourceEncoding?: string;
   datasourceLink?: string;
+  // System fields
+  createdAt: Date;
+  createdBy: string;
 }
 
 export interface DataSpace {
@@ -91,7 +105,7 @@ export interface DataSpace {
   isActive: boolean;
   members: DataSpaceMember[];
   creatorWebId: string;
-  assetMetadata: AssetMetadata;
+  metadata: DataSpaceMetadata[];
   tags: string[];
   category?: string;
 }
@@ -112,7 +126,7 @@ export interface CreateDataSpaceInput {
   tags?: string[];
 }
 
-export interface UpdateAssetMetadataInput extends Partial<AssetMetadata> {}
+export interface AddMetadataInput extends Omit<DataSpaceMetadata, 'id' | 'createdAt' | 'createdBy'> {}
 
 export class DataSpaceService {
   private static instance: DataSpaceService;
@@ -454,83 +468,110 @@ export class DataSpaceService {
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
   }
 
-  async updateAssetMetadata(dataSpaceId: string, metadata: UpdateAssetMetadataInput): Promise<void> {
+  async addMetadata(dataSpaceId: string, metadata: AddMetadataInput): Promise<void> {
+    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
+    const fetch = this.auth.getFetch();
+    const currentWebId = this.auth.getWebId() || '';
+    
+    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+    
+    // Create new metadata thing
+    const metadataId = `metadata-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    let metadataThing = createThing({ name: metadataId });
+    
+    // Add basic metadata properties
+    metadataThing = addStringNoLocale(metadataThing, RDF.type, DS.Metadata);
+    metadataThing = addStringNoLocale(metadataThing, DS.metadataTitle, metadata.title);
+    metadataThing = addDatetime(metadataThing, DCTERMS.created, new Date());
+    metadataThing = addStringNoLocale(metadataThing, DS.createdBy, currentWebId);
+    
+    // Add asset information
+    if (metadata.assetCreated) {
+      metadataThing = addDatetime(metadataThing, DS.assetCreated, metadata.assetCreated);
+    }
+    if (metadata.assetLastModified) {
+      metadataThing = addDatetime(metadataThing, DS.assetLastModified, metadata.assetLastModified);
+    }
+    if (metadata.description) {
+      metadataThing = addStringNoLocale(metadataThing, DCTERMS.description, metadata.description);
+    }
+    if (metadata.originalTitle) {
+      metadataThing = addStringNoLocale(metadataThing, DS.originalTitle, metadata.originalTitle);
+    }
+    if (metadata.openDataSourceLink) {
+      metadataThing = addStringNoLocale(metadataThing, DS.openDataSourceLink, metadata.openDataSourceLink);
+    }
+    if (metadata.dataFormat) {
+      metadataThing = addStringNoLocale(metadataThing, DS.dataFormat, metadata.dataFormat);
+    }
+    if (metadata.categories) {
+      metadata.categories.forEach(category => {
+        metadataThing = addStringNoLocale(metadataThing, DS.category, category);
+      });
+    }
+    
+    // Add usage & settings
+    if (metadata.chargeable !== undefined) {
+      metadataThing = addBoolean(metadataThing, DS.chargeable, metadata.chargeable);
+    }
+    if (metadata.useSetting) {
+      metadataThing = addStringNoLocale(metadataThing, DS.useSetting, metadata.useSetting);
+    }
+    if (metadata.datasourceLanguage) {
+      metadataThing = addStringNoLocale(metadataThing, DS.datasourceLanguage, metadata.datasourceLanguage);
+    }
+    if (metadata.metadataLanguage) {
+      metadataThing = addStringNoLocale(metadataThing, DS.metadataLanguage, metadata.metadataLanguage);
+    }
+    
+    // Add temporal coverage
+    if (metadata.temporalCoverageBeginning) {
+      metadataThing = addDatetime(metadataThing, DS.temporalCoverageBeginning, metadata.temporalCoverageBeginning);
+    }
+    if (metadata.temporalCoverageEnding) {
+      metadataThing = addDatetime(metadataThing, DS.temporalCoverageEnding, metadata.temporalCoverageEnding);
+    }
+    if (metadata.linkedMetadata) {
+      metadataThing = addStringNoLocale(metadataThing, DS.linkedMetadata, metadata.linkedMetadata);
+    }
+    if (metadata.updateFrequency) {
+      metadataThing = addStringNoLocale(metadataThing, DS.updateFrequency, metadata.updateFrequency);
+    }
+    
+    // Add geographic information
+    if (metadata.geographicCoverage) {
+      metadataThing = addStringNoLocale(metadataThing, DS.geographicCoverage, metadata.geographicCoverage);
+    }
+    if (metadata.geographicExpansion) {
+      metadataThing = addStringNoLocale(metadataThing, DS.geographicExpansion, metadata.geographicExpansion);
+    }
+    
+    // Add resource information
+    if (metadata.resourceSize) {
+      metadataThing = addStringNoLocale(metadataThing, DS.resourceSize, metadata.resourceSize);
+    }
+    if (metadata.resourceEncoding) {
+      metadataThing = addStringNoLocale(metadataThing, DS.resourceEncoding, metadata.resourceEncoding);
+    }
+    if (metadata.datasourceLink) {
+      metadataThing = addStringNoLocale(metadataThing, DS.datasourceLink, metadata.datasourceLink);
+    }
+    
+    dataset = setThing(dataset, metadataThing);
+    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+  }
+
+  async removeMetadata(dataSpaceId: string, metadataId: string): Promise<void> {
     const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
     const fetch = this.auth.getFetch();
     
     let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
-    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${dataSpaceId}`);
+    const metadataThing = getThing(dataset, `${dataSpaceUrl}#${metadataId}`);
     
-    if (!dataSpaceThing) {
-      throw new Error('DataSpace not found');
+    if (metadataThing) {
+      dataset = removeThing(dataset, metadataThing);
+      await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
     }
-
-    // Update asset metadata fields
-    if (metadata.assetCreated !== undefined) {
-      dataSpaceThing = addDatetime(dataSpaceThing, DS.assetCreated, metadata.assetCreated);
-    }
-    if (metadata.assetLastModified !== undefined) {
-      dataSpaceThing = addDatetime(dataSpaceThing, DS.assetLastModified, metadata.assetLastModified);
-    }
-    if (metadata.description !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.description, metadata.description);
-    }
-    if (metadata.originalTitle !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.originalTitle, metadata.originalTitle);
-    }
-    if (metadata.openDataSourceLink !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.openDataSourceLink, metadata.openDataSourceLink);
-    }
-    if (metadata.dataFormat !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.dataFormat, metadata.dataFormat);
-    }
-    if (metadata.categories !== undefined) {
-      metadata.categories.forEach(category => {
-        dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.category, category);
-      });
-    }
-    if (metadata.chargeable !== undefined) {
-      dataSpaceThing = addBoolean(dataSpaceThing, DS.chargeable, metadata.chargeable);
-    }
-    if (metadata.useSetting !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.useSetting, metadata.useSetting);
-    }
-    if (metadata.datasourceLanguage !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.datasourceLanguage, metadata.datasourceLanguage);
-    }
-    if (metadata.metadataLanguage !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.metadataLanguage, metadata.metadataLanguage);
-    }
-    if (metadata.temporalCoverageBeginning !== undefined) {
-      dataSpaceThing = addDatetime(dataSpaceThing, DS.temporalCoverageBeginning, metadata.temporalCoverageBeginning);
-    }
-    if (metadata.temporalCoverageEnding !== undefined) {
-      dataSpaceThing = addDatetime(dataSpaceThing, DS.temporalCoverageEnding, metadata.temporalCoverageEnding);
-    }
-    if (metadata.linkedMetadata !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.linkedMetadata, metadata.linkedMetadata);
-    }
-    if (metadata.updateFrequency !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.updateFrequency, metadata.updateFrequency);
-    }
-    if (metadata.geographicCoverage !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.geographicCoverage, metadata.geographicCoverage);
-    }
-    if (metadata.geographicExpansion !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.geographicExpansion, metadata.geographicExpansion);
-    }
-    if (metadata.resourceSize !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.resourceSize, metadata.resourceSize);
-    }
-    if (metadata.resourceEncoding !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.resourceEncoding, metadata.resourceEncoding);
-    }
-    if (metadata.datasourceLink !== undefined) {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.datasourceLink, metadata.datasourceLink);
-    }
-
-    dataset = setThing(dataset, dataSpaceThing);
-    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
   }
 
   private handleUpdate = () => {
@@ -567,28 +608,48 @@ export class DataSpaceService {
       joinedAt: getDatetime(memberThing, DS.joinedAt) || new Date(),
     }));
 
-    // Parse asset metadata
-    const assetMetadata: AssetMetadata = {
-      assetCreated: getDatetime(dataSpaceThing, DS.assetCreated) || undefined,
-      assetLastModified: getDatetime(dataSpaceThing, DS.assetLastModified) || undefined,
-      description: getStringNoLocale(dataSpaceThing, DCTERMS.description) || undefined,
-      originalTitle: getStringNoLocale(dataSpaceThing, DS.originalTitle) || undefined,
-      openDataSourceLink: getStringNoLocale(dataSpaceThing, DS.openDataSourceLink) || undefined,
-      dataFormat: getStringNoLocale(dataSpaceThing, DS.dataFormat) || undefined,
-      chargeable: getBoolean(dataSpaceThing, DS.chargeable) || undefined,
-      useSetting: getStringNoLocale(dataSpaceThing, DS.useSetting) || undefined,
-      datasourceLanguage: getStringNoLocale(dataSpaceThing, DS.datasourceLanguage) || undefined,
-      metadataLanguage: getStringNoLocale(dataSpaceThing, DS.metadataLanguage) || undefined,
-      temporalCoverageBeginning: getDatetime(dataSpaceThing, DS.temporalCoverageBeginning) || undefined,
-      temporalCoverageEnding: getDatetime(dataSpaceThing, DS.temporalCoverageEnding) || undefined,
-      linkedMetadata: getStringNoLocale(dataSpaceThing, DS.linkedMetadata) || undefined,
-      updateFrequency: getStringNoLocale(dataSpaceThing, DS.updateFrequency) || undefined,
-      geographicCoverage: getStringNoLocale(dataSpaceThing, DS.geographicCoverage) || undefined,
-      geographicExpansion: getStringNoLocale(dataSpaceThing, DS.geographicExpansion) || undefined,
-      resourceSize: getStringNoLocale(dataSpaceThing, DS.resourceSize) || undefined,
-      resourceEncoding: getStringNoLocale(dataSpaceThing, DS.resourceEncoding) || undefined,
-      datasourceLink: getStringNoLocale(dataSpaceThing, DS.datasourceLink) || undefined,
-    };
+    // Parse metadata
+    const metadataThings = getThingAll(dataset).filter(thing => 
+      getStringNoLocale(thing, RDF.type) === DS.Metadata
+    );
+    
+    const metadata: DataSpaceMetadata[] = metadataThings.map(metadataThing => {
+      const categories: string[] = [];
+      // Extract multiple category values
+      const categoryLiterals = metadataThing.predicates[DS.category]?.literals;
+      if (categoryLiterals) {
+        Object.keys(categoryLiterals).forEach(literal => {
+          categories.push(literal);
+        });
+      }
+
+      return {
+        id: metadataThing.url.split('#')[1] || '',
+        title: getStringNoLocale(metadataThing, DS.metadataTitle) || '',
+        assetCreated: getDatetime(metadataThing, DS.assetCreated) || undefined,
+        assetLastModified: getDatetime(metadataThing, DS.assetLastModified) || undefined,
+        description: getStringNoLocale(metadataThing, DCTERMS.description) || undefined,
+        originalTitle: getStringNoLocale(metadataThing, DS.originalTitle) || undefined,
+        openDataSourceLink: getStringNoLocale(metadataThing, DS.openDataSourceLink) || undefined,
+        dataFormat: getStringNoLocale(metadataThing, DS.dataFormat) || undefined,
+        categories: categories.length > 0 ? categories : undefined,
+        chargeable: getBoolean(metadataThing, DS.chargeable) || undefined,
+        useSetting: getStringNoLocale(metadataThing, DS.useSetting) || undefined,
+        datasourceLanguage: getStringNoLocale(metadataThing, DS.datasourceLanguage) || undefined,
+        metadataLanguage: getStringNoLocale(metadataThing, DS.metadataLanguage) || undefined,
+        temporalCoverageBeginning: getDatetime(metadataThing, DS.temporalCoverageBeginning) || undefined,
+        temporalCoverageEnding: getDatetime(metadataThing, DS.temporalCoverageEnding) || undefined,
+        linkedMetadata: getStringNoLocale(metadataThing, DS.linkedMetadata) || undefined,
+        updateFrequency: getStringNoLocale(metadataThing, DS.updateFrequency) || undefined,
+        geographicCoverage: getStringNoLocale(metadataThing, DS.geographicCoverage) || undefined,
+        geographicExpansion: getStringNoLocale(metadataThing, DS.geographicExpansion) || undefined,
+        resourceSize: getStringNoLocale(metadataThing, DS.resourceSize) || undefined,
+        resourceEncoding: getStringNoLocale(metadataThing, DS.resourceEncoding) || undefined,
+        datasourceLink: getStringNoLocale(metadataThing, DS.datasourceLink) || undefined,
+        createdAt: getDatetime(metadataThing, DCTERMS.created) || new Date(),
+        createdBy: getStringNoLocale(metadataThing, DS.createdBy) || '',
+      };
+    });
 
     // Parse tags - get all tag values from the dataspace thing
     const allThings = getThingAll(dataset);
@@ -618,7 +679,7 @@ export class DataSpaceService {
       isActive: getBoolean(dataSpaceThing, DS.isActive) ?? true,
       creatorWebId: getStringNoLocale(dataSpaceThing, DCTERMS.creator) || '',
       members,
-      assetMetadata,
+      metadata,
       tags,
       category,
     };
