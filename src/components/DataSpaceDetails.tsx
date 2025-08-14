@@ -54,6 +54,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataManager from './DataManager';
 import AssetList from './AssetList';
+import AssetDetails from './AssetDetails';
+import { Asset } from '@/services/assetService';
 
 interface DataSpaceDetailsProps {
   dataSpace: DataSpace;
@@ -64,6 +66,7 @@ interface DataSpaceDetailsProps {
 const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editFormData, setEditFormData] = useState({
     title: dataSpace.title,
     description: dataSpace.description,
@@ -361,13 +364,22 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
         </TabsContent>
 
         <TabsContent value="assets">
-          <AssetList 
-            dataSpaceId={dataSpace.id} 
-            onAssetSelect={(asset) => {
-              // This would need to be passed from parent to handle navigation
-              console.log('Selected asset:', asset);
-            }}
-          />
+          {selectedAsset ? (
+            <AssetDetails 
+              asset={selectedAsset}
+              dataSpaceId={dataSpace.id}
+              onBack={() => setSelectedAsset(null)}
+              onUpdate={() => {
+                // Refresh asset data if needed
+                setSelectedAsset(null);
+              }}
+            />
+          ) : (
+            <AssetList 
+              dataSpaceId={dataSpace.id} 
+              onAssetSelect={(asset) => setSelectedAsset(asset)}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6">

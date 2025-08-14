@@ -56,11 +56,12 @@ import DataManager from './DataManager';
 
 interface AssetDetailsProps {
   asset: Asset;
+  dataSpaceId: string;
   onUpdate: () => void;
   onBack: () => void;
 }
 
-const AssetDetails = ({ asset, onUpdate, onBack }: AssetDetailsProps) => {
+const AssetDetails = ({ asset, dataSpaceId, onUpdate, onBack }: AssetDetailsProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [editFormData, setEditFormData] = useState({
