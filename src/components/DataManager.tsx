@@ -52,7 +52,7 @@ const DataManager = ({ dataSpace }: DataManagerProps) => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedTag, setSelectedTag] = useState('');
+  const [selectedTag, setSelectedTag] = useState('__all__');
 
   const dataService = DataService.getInstance();
 
@@ -101,7 +101,7 @@ const DataManager = ({ dataSpace }: DataManagerProps) => {
     }
 
     // Tag filter
-    if (selectedTag) {
+    if (selectedTag && selectedTag !== '__all__') {
       filtered = filtered.filter(entry => entry.tags.includes(selectedTag));
     }
 
@@ -176,7 +176,7 @@ const DataManager = ({ dataSpace }: DataManagerProps) => {
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('all');
-    setSelectedTag('');
+    setSelectedTag('__all__');
   };
 
   if (isLoading) {
@@ -298,7 +298,7 @@ const DataManager = ({ dataSpace }: DataManagerProps) => {
                   <SelectValue placeholder="All Tags" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Tags</SelectItem>
+                  <SelectItem value="__all__">All Tags</SelectItem>
                   {getAllTags().map(tag => (
                     <SelectItem key={tag} value={tag}>
                       {tag}

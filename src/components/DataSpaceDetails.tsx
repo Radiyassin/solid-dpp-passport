@@ -438,11 +438,13 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
             <TableBody>
               {dataSpace.members.map((member) => (
                 <TableRow key={member.webId}>
-                  <TableCell className="font-mono text-sm break-all max-w-xs">
-                    {member.webId}
-                    {member.webId === currentWebId && (
-                      <Badge variant="secondary" className="ml-2">You</Badge>
-                    )}
+                  <TableCell>
+                    <div className="font-mono text-sm break-all max-w-xs">
+                      {member.webId}
+                      {member.webId === currentWebId && (
+                        <Badge variant="secondary" className="ml-2">You</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {isAdmin && member.webId !== currentWebId ? (
