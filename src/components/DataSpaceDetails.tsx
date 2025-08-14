@@ -53,7 +53,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataManager from './DataManager';
-import MetadataManager from './MetadataManager';
+import AssetMetadataManager from './AssetMetadataManager';
 
 interface DataSpaceDetailsProps {
   dataSpace: DataSpace;
@@ -365,7 +365,7 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
         </TabsContent>
 
         <TabsContent value="metadata">
-          <MetadataManager dataSpace={dataSpace} onUpdate={onUpdate} />
+          <AssetMetadataManager dataSpace={dataSpace} onUpdate={onUpdate} />
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6">

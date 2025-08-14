@@ -31,12 +31,25 @@ const DS = {
   memberWebId: "https://w3id.org/dataspace/vocab#memberWebId",
   memberRole: "https://w3id.org/dataspace/vocab#memberRole",
   joinedAt: "https://w3id.org/dataspace/vocab#joinedAt",
-  // Metadata vocabulary
-  Metadata: "https://w3id.org/dataspace/vocab#Metadata",
-  hasMetadata: "https://w3id.org/dataspace/vocab#hasMetadata",
-  metadataKey: "https://w3id.org/dataspace/vocab#metadataKey",
-  metadataValue: "https://w3id.org/dataspace/vocab#metadataValue",
-  metadataType: "https://w3id.org/dataspace/vocab#metadataType",
+  // Asset Metadata vocabulary
+  assetCreated: "https://w3id.org/dataspace/vocab#assetCreated",
+  assetLastModified: "https://w3id.org/dataspace/vocab#assetLastModified",
+  originalTitle: "https://w3id.org/dataspace/vocab#originalTitle",
+  openDataSourceLink: "https://w3id.org/dataspace/vocab#openDataSourceLink",
+  dataFormat: "https://w3id.org/dataspace/vocab#dataFormat",
+  chargeable: "https://w3id.org/dataspace/vocab#chargeable",
+  useSetting: "https://w3id.org/dataspace/vocab#useSetting",
+  datasourceLanguage: "https://w3id.org/dataspace/vocab#datasourceLanguage",
+  metadataLanguage: "https://w3id.org/dataspace/vocab#metadataLanguage",
+  temporalCoverageBeginning: "https://w3id.org/dataspace/vocab#temporalCoverageBeginning",
+  temporalCoverageEnding: "https://w3id.org/dataspace/vocab#temporalCoverageEnding",
+  linkedMetadata: "https://w3id.org/dataspace/vocab#linkedMetadata",
+  updateFrequency: "https://w3id.org/dataspace/vocab#updateFrequency",
+  geographicCoverage: "https://w3id.org/dataspace/vocab#geographicCoverage",
+  geographicExpansion: "https://w3id.org/dataspace/vocab#geographicExpansion",
+  resourceSize: "https://w3id.org/dataspace/vocab#resourceSize",
+  resourceEncoding: "https://w3id.org/dataspace/vocab#resourceEncoding",
+  datasourceLink: "https://w3id.org/dataspace/vocab#datasourceLink",
   category: "https://w3id.org/dataspace/vocab#category",
   tags: "https://w3id.org/dataspace/vocab#tags",
 };
@@ -44,13 +57,27 @@ const DS = {
 export type DataSpaceRole = 'admin' | 'write' | 'read';
 export type AccessMode = 'public' | 'private' | 'restricted';
 
-export interface DataSpaceMetadata {
-  id: string;
-  key: string;
-  value: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'url';
-  category?: string;
-  createdAt: Date;
+export interface AssetMetadata {
+  assetCreated?: Date;
+  assetLastModified?: Date;
+  description?: string;
+  originalTitle?: string;
+  openDataSourceLink?: string;
+  dataFormat?: string;
+  categories?: string[];
+  chargeable?: boolean;
+  useSetting?: string;
+  datasourceLanguage?: string;
+  metadataLanguage?: string;
+  temporalCoverageBeginning?: Date;
+  temporalCoverageEnding?: Date;
+  linkedMetadata?: string;
+  updateFrequency?: string;
+  geographicCoverage?: string;
+  geographicExpansion?: string;
+  resourceSize?: string;
+  resourceEncoding?: string;
+  datasourceLink?: string;
 }
 
 export interface DataSpace {
@@ -64,7 +91,7 @@ export interface DataSpace {
   isActive: boolean;
   members: DataSpaceMember[];
   creatorWebId: string;
-  metadata: DataSpaceMetadata[];
+  assetMetadata: AssetMetadata;
   tags: string[];
   category?: string;
 }
@@ -85,12 +112,7 @@ export interface CreateDataSpaceInput {
   tags?: string[];
 }
 
-export interface AddMetadataInput {
-  key: string;
-  value: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'url';
-  category?: string;
-}
+export interface UpdateAssetMetadataInput extends Partial<AssetMetadata> {}
 
 export class DataSpaceService {
   private static instance: DataSpaceService;
@@ -432,43 +454,7 @@ export class DataSpaceService {
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
   }
 
-  async addMetadata(dataSpaceId: string, metadata: AddMetadataInput): Promise<void> {
-    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
-    const fetch = this.auth.getFetch();
-    
-    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
-    
-    // Create new metadata thing
-    const metadataId = `metadata-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    let metadataThing = createThing({ name: metadataId });
-    metadataThing = addStringNoLocale(metadataThing, RDF.type, DS.Metadata);
-    metadataThing = addStringNoLocale(metadataThing, DS.metadataKey, metadata.key);
-    metadataThing = addStringNoLocale(metadataThing, DS.metadataValue, metadata.value);
-    metadataThing = addStringNoLocale(metadataThing, DS.metadataType, metadata.type);
-    metadataThing = addDatetime(metadataThing, DCTERMS.created, new Date());
-    
-    if (metadata.category) {
-      metadataThing = addStringNoLocale(metadataThing, DS.category, metadata.category);
-    }
-    
-    dataset = setThing(dataset, metadataThing);
-    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
-  }
-
-  async removeMetadata(dataSpaceId: string, metadataId: string): Promise<void> {
-    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
-    const fetch = this.auth.getFetch();
-    
-    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
-    const metadataThing = getThing(dataset, `${dataSpaceUrl}#${metadataId}`);
-    
-    if (metadataThing) {
-      dataset = removeThing(dataset, metadataThing);
-      await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
-    }
-  }
-
-  async updateDataSpaceTags(dataSpaceId: string, tags: string[]): Promise<void> {
+  async updateAssetMetadata(dataSpaceId: string, metadata: UpdateAssetMetadataInput): Promise<void> {
     const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
     const fetch = this.auth.getFetch();
     
@@ -479,46 +465,78 @@ export class DataSpaceService {
       throw new Error('DataSpace not found');
     }
 
-    // Remove existing tags and add new ones
-    const existingThings = getThingAll(dataset);
-    existingThings.forEach(thing => {
-      if (getStringNoLocale(thing, DS.tags)) {
-        // Remove old tag associations
-        let updatedThing = thing;
-        // Clear existing tags - we'll re-add them
-        const tagValues = thing.predicates[DS.tags];
-        if (tagValues) {
-          tagValues.namedNodes?.forEach(() => {
-            // Remove each tag individually would be complex, simpler to rebuild
-          });
-        }
-      }
-    });
-
-    // Add new tags
-    tags.forEach(tag => {
-      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.tags, tag);
-    });
-
-    dataset = setThing(dataset, dataSpaceThing);
-    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
-  }
-
-  async updateDataSpaceCategory(dataSpaceId: string, category: string): Promise<void> {
-    const dataSpaceUrl = this.getDataSpaceUrl(dataSpaceId);
-    const fetch = this.auth.getFetch();
-    
-    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
-    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${dataSpaceId}`);
-    
-    if (!dataSpaceThing) {
-      throw new Error('DataSpace not found');
+    // Update asset metadata fields
+    if (metadata.assetCreated !== undefined) {
+      dataSpaceThing = addDatetime(dataSpaceThing, DS.assetCreated, metadata.assetCreated);
+    }
+    if (metadata.assetLastModified !== undefined) {
+      dataSpaceThing = addDatetime(dataSpaceThing, DS.assetLastModified, metadata.assetLastModified);
+    }
+    if (metadata.description !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DCTERMS.description, metadata.description);
+    }
+    if (metadata.originalTitle !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.originalTitle, metadata.originalTitle);
+    }
+    if (metadata.openDataSourceLink !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.openDataSourceLink, metadata.openDataSourceLink);
+    }
+    if (metadata.dataFormat !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.dataFormat, metadata.dataFormat);
+    }
+    if (metadata.categories !== undefined) {
+      metadata.categories.forEach(category => {
+        dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.category, category);
+      });
+    }
+    if (metadata.chargeable !== undefined) {
+      dataSpaceThing = addBoolean(dataSpaceThing, DS.chargeable, metadata.chargeable);
+    }
+    if (metadata.useSetting !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.useSetting, metadata.useSetting);
+    }
+    if (metadata.datasourceLanguage !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.datasourceLanguage, metadata.datasourceLanguage);
+    }
+    if (metadata.metadataLanguage !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.metadataLanguage, metadata.metadataLanguage);
+    }
+    if (metadata.temporalCoverageBeginning !== undefined) {
+      dataSpaceThing = addDatetime(dataSpaceThing, DS.temporalCoverageBeginning, metadata.temporalCoverageBeginning);
+    }
+    if (metadata.temporalCoverageEnding !== undefined) {
+      dataSpaceThing = addDatetime(dataSpaceThing, DS.temporalCoverageEnding, metadata.temporalCoverageEnding);
+    }
+    if (metadata.linkedMetadata !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.linkedMetadata, metadata.linkedMetadata);
+    }
+    if (metadata.updateFrequency !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.updateFrequency, metadata.updateFrequency);
+    }
+    if (metadata.geographicCoverage !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.geographicCoverage, metadata.geographicCoverage);
+    }
+    if (metadata.geographicExpansion !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.geographicExpansion, metadata.geographicExpansion);
+    }
+    if (metadata.resourceSize !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.resourceSize, metadata.resourceSize);
+    }
+    if (metadata.resourceEncoding !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.resourceEncoding, metadata.resourceEncoding);
+    }
+    if (metadata.datasourceLink !== undefined) {
+      dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.datasourceLink, metadata.datasourceLink);
     }
 
-    dataSpaceThing = addStringNoLocale(dataSpaceThing, DS.category, category);
     dataset = setThing(dataset, dataSpaceThing);
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
   }
+
+  private handleUpdate = () => {
+    // Function to trigger re-renders when data changes
+    // This would be used by components to refresh their data
+  };
 
   private parseDataSpace(id: string, dataset: any): DataSpace {
     const dataSpaceUrl = this.getDataSpaceUrl(id);
@@ -549,19 +567,28 @@ export class DataSpaceService {
       joinedAt: getDatetime(memberThing, DS.joinedAt) || new Date(),
     }));
 
-    // Parse metadata
-    const metadataThings = getThingAll(dataset).filter(thing => 
-      getStringNoLocale(thing, RDF.type) === DS.Metadata
-    );
-    
-    const metadata: DataSpaceMetadata[] = metadataThings.map(metadataThing => ({
-      id: metadataThing.url.split('#')[1] || '',
-      key: getStringNoLocale(metadataThing, DS.metadataKey) || '',
-      value: getStringNoLocale(metadataThing, DS.metadataValue) || '',
-      type: (getStringNoLocale(metadataThing, DS.metadataType) as any) || 'string',
-      category: getStringNoLocale(metadataThing, DS.category) || undefined,
-      createdAt: getDatetime(metadataThing, DCTERMS.created) || new Date(),
-    }));
+    // Parse asset metadata
+    const assetMetadata: AssetMetadata = {
+      assetCreated: getDatetime(dataSpaceThing, DS.assetCreated) || undefined,
+      assetLastModified: getDatetime(dataSpaceThing, DS.assetLastModified) || undefined,
+      description: getStringNoLocale(dataSpaceThing, DCTERMS.description) || undefined,
+      originalTitle: getStringNoLocale(dataSpaceThing, DS.originalTitle) || undefined,
+      openDataSourceLink: getStringNoLocale(dataSpaceThing, DS.openDataSourceLink) || undefined,
+      dataFormat: getStringNoLocale(dataSpaceThing, DS.dataFormat) || undefined,
+      chargeable: getBoolean(dataSpaceThing, DS.chargeable) || undefined,
+      useSetting: getStringNoLocale(dataSpaceThing, DS.useSetting) || undefined,
+      datasourceLanguage: getStringNoLocale(dataSpaceThing, DS.datasourceLanguage) || undefined,
+      metadataLanguage: getStringNoLocale(dataSpaceThing, DS.metadataLanguage) || undefined,
+      temporalCoverageBeginning: getDatetime(dataSpaceThing, DS.temporalCoverageBeginning) || undefined,
+      temporalCoverageEnding: getDatetime(dataSpaceThing, DS.temporalCoverageEnding) || undefined,
+      linkedMetadata: getStringNoLocale(dataSpaceThing, DS.linkedMetadata) || undefined,
+      updateFrequency: getStringNoLocale(dataSpaceThing, DS.updateFrequency) || undefined,
+      geographicCoverage: getStringNoLocale(dataSpaceThing, DS.geographicCoverage) || undefined,
+      geographicExpansion: getStringNoLocale(dataSpaceThing, DS.geographicExpansion) || undefined,
+      resourceSize: getStringNoLocale(dataSpaceThing, DS.resourceSize) || undefined,
+      resourceEncoding: getStringNoLocale(dataSpaceThing, DS.resourceEncoding) || undefined,
+      datasourceLink: getStringNoLocale(dataSpaceThing, DS.datasourceLink) || undefined,
+    };
 
     // Parse tags - get all tag values from the dataspace thing
     const allThings = getThingAll(dataset);
@@ -591,7 +618,7 @@ export class DataSpaceService {
       isActive: getBoolean(dataSpaceThing, DS.isActive) ?? true,
       creatorWebId: getStringNoLocale(dataSpaceThing, DCTERMS.creator) || '',
       members,
-      metadata,
+      assetMetadata,
       tags,
       category,
     };
