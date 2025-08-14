@@ -53,7 +53,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataManager from './DataManager';
-import MetadataManager from './MetadataManager';
+import AssetList from './AssetList';
 
 interface DataSpaceDetailsProps {
   dataSpace: DataSpace;
@@ -247,22 +247,18 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="metadata" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Metadata
+          <TabsTrigger value="assets" className="flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Assets
           </TabsTrigger>
           <TabsTrigger value="members" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Members
-          </TabsTrigger>
-          <TabsTrigger value="data" className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
-            Data
           </TabsTrigger>
         </TabsList>
 
@@ -364,8 +360,14 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
       </Card>
         </TabsContent>
 
-        <TabsContent value="metadata">
-          <MetadataManager dataSpace={dataSpace} onUpdate={onUpdate} />
+        <TabsContent value="assets">
+          <AssetList 
+            dataSpaceId={dataSpace.id} 
+            onAssetSelect={(asset) => {
+              // This would need to be passed from parent to handle navigation
+              console.log('Selected asset:', asset);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6">
@@ -501,10 +503,6 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           </Table>
         </CardContent>
       </Card>
-        </TabsContent>
-
-        <TabsContent value="data">
-          <DataManager dataSpace={dataSpace} />
         </TabsContent>
       </Tabs>
     </div>
