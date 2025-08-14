@@ -1,17 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -22,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { Asset, AssetService } from '@/services/assetService';
-import { DataSpaceRole } from '@/services/dataSpaceService';
+import { DataSpaceRole, DataSpaceService } from '@/services/dataSpaceService';
 import { SolidAuthService } from '@/services/solidAuth';
 import { 
   ArrowLeft, 
@@ -38,18 +31,8 @@ import {
   Eye,
   FileText,
   Settings,
-  UserPlus,
   Package
 } from 'lucide-react';
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AssetMetadataManager from './AssetMetadataManager';
 import DataManager from './DataManager';
@@ -68,19 +51,39 @@ const AssetDetails = ({ asset, dataSpaceId, onUpdate, onBack }: AssetDetailsProp
     title: asset.title,
     description: asset.description,
   });
-  const [newMemberWebId, setNewMemberWebId] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<DataSpaceRole>('read');
-  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
+  const [dataSpaceMembers, setDataSpaceMembers] = useState<any[]>([]);
+  const [currentWebId, setCurrentWebId] = useState<string | null>(null);
   
   const assetService = AssetService.getInstance();
+  const dataSpaceService = DataSpaceService.getInstance();
   const auth = SolidAuthService.getInstance();
-  const currentWebId = auth.getWebId();
 
   const isAdmin = asset.members.find(m => m.webId === currentWebId)?.role === 'admin';
 
+  useEffect(() => {
+    loadCurrentUser();
+    loadDataSpaceMembers();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    const webId = auth.getWebId();
+    setCurrentWebId(webId);
+  };
+
+  const loadDataSpaceMembers = async () => {
+    try {
+      const dataSpace = await dataSpaceService.getDataSpace(dataSpaceId);
+      if (dataSpace) {
+        setDataSpaceMembers(dataSpace.members);
+      }
+    } catch (error) {
+      console.error('Error loading dataspace members:', error);
+    }
+  };
+
   const handleSaveEdit = async () => {
     try {
-      await assetService.updateAsset(asset.dataSpaceId, asset.id, editFormData);
+      await assetService.updateAsset(dataSpaceId, asset.id, editFormData);
       setIsEditing(false);
       onUpdate();
       toast({
@@ -105,31 +108,27 @@ const AssetDetails = ({ asset, dataSpaceId, onUpdate, onBack }: AssetDetailsProp
     setIsEditing(false);
   };
 
-  const handleAddMember = async () => {
-    if (!newMemberWebId.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a valid WebID',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  const handleToggleMemberAccess = async (memberWebId: string, hasAccess: boolean) => {
     try {
-      await assetService.addAssetMember(asset.dataSpaceId, asset.id, newMemberWebId.trim(), newMemberRole);
-      setNewMemberWebId('');
-      setNewMemberRole('read');
-      setShowAddMemberDialog(false);
+      if (hasAccess) {
+        await assetService.removeAssetMember(dataSpaceId, asset.id, memberWebId);
+        toast({
+          title: 'Success',
+          description: 'Member access removed',
+        });
+      } else {
+        await assetService.addAssetMember(dataSpaceId, asset.id, memberWebId, 'read');
+        toast({
+          title: 'Success',
+          description: 'Member access granted',
+        });
+      }
       onUpdate();
-      toast({
-        title: 'Success',
-        description: 'Member added successfully',
-      });
     } catch (error) {
-      console.error('Error adding member:', error);
+      console.error('Error toggling member access:', error);
       toast({
         title: 'Error',
-        description: 'Failed to add member',
+        description: 'Failed to update member access',
         variant: 'destructive',
       });
     }
@@ -137,7 +136,7 @@ const AssetDetails = ({ asset, dataSpaceId, onUpdate, onBack }: AssetDetailsProp
 
   const handleRemoveMember = async (memberWebId: string) => {
     try {
-      await assetService.removeAssetMember(asset.dataSpaceId, asset.id, memberWebId);
+      await assetService.removeAssetMember(dataSpaceId, asset.id, memberWebId);
       onUpdate();
       toast({
         title: 'Success',
@@ -318,120 +317,129 @@ const AssetDetails = ({ asset, dataSpaceId, onUpdate, onBack }: AssetDetailsProp
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6">
-          {/* Members Management */}
           <Card className="bg-gradient-card shadow-card">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5" />
-                    Members ({asset.members.length})
+                    Asset Access Control
                   </CardTitle>
                   <CardDescription>
-                    Manage access and permissions for asset members
+                    Select which dataspace members can access this asset
                   </CardDescription>
                 </div>
-                {isAdmin && (
-                  <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Add Member
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add New Member</DialogTitle>
-                        <DialogDescription>
-                          Invite someone to access this asset by their WebID
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="member-webid">WebID</Label>
-                          <Input
-                            id="member-webid"
-                            placeholder="https://example.solidcommunity.net/profile/card#me"
-                            value={newMemberWebId}
-                            onChange={(e) => setNewMemberWebId(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="member-role">Role</Label>
-                          <Select value={newMemberRole} onValueChange={(value: DataSpaceRole) => setNewMemberRole(value)}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="read">Read - Can view data</SelectItem>
-                              <SelectItem value="write">Write - Can modify data</SelectItem>
-                              <SelectItem value="admin">Admin - Full access</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleAddMember}>
-                          Add Member
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
               </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>WebID</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Joined</TableHead>
-                    {isAdmin && <TableHead>Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {asset.members.map((member) => (
-                    <TableRow key={member.webId}>
-                      <TableCell>
-                        <div className="font-mono text-sm break-all max-w-xs">
-                          {member.webId}
-                          {member.webId === currentWebId && (
-                            <Badge variant="secondary" className="ml-2">You</Badge>
+            <CardContent className="space-y-6">
+              {/* DataSpace Members Selection */}
+              <div>
+                <h4 className="text-sm font-medium mb-3">Dataspace Members</h4>
+                <div className="grid gap-3">
+                  {dataSpaceMembers.map((member) => {
+                    const hasAssetAccess = asset.members.some(assetMember => assetMember.webId === member.webId);
+                    const assetMember = asset.members.find(assetMember => assetMember.webId === member.webId);
+                    
+                    return (
+                      <Card key={member.webId} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-mono text-sm break-all max-w-xs">
+                              {member.webId}
+                              {member.webId === currentWebId && (
+                                <Badge variant="secondary" className="ml-2">You</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge className={getRoleColor(member.role)}>
+                                <span className="flex items-center gap-1">
+                                  {getRoleIcon(member.role)}
+                                  {member.role} in dataspace
+                                </span>
+                              </Badge>
+                              {hasAssetAccess && assetMember && (
+                                <Badge variant="outline">
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Asset access: {assetMember.role}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {isAdmin && member.webId !== currentWebId && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                onClick={() => handleToggleMemberAccess(member.webId, hasAssetAccess)}
+                                variant={hasAssetAccess ? "destructive" : "default"}
+                                size="sm"
+                              >
+                                {hasAssetAccess ? (
+                                  <>
+                                    <X className="w-4 h-4 mr-2" />
+                                    Remove Access
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Grant Access
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getRoleColor(member.role)}>
-                          <span className="flex items-center gap-1">
-                            {getRoleIcon(member.role)}
-                            {member.role}
-                          </span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {member.joinedAt.toLocaleDateString()}
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell>
-                          {member.webId !== currentWebId && (
-                            <Button
-                              onClick={() => handleRemoveMember(member.webId)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </Card>
+                    );
+                  })}
+                  
+                  {dataSpaceMembers.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No dataspace members found</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Current Asset Members Summary */}
+              {asset.members.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-3">Current Asset Members</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>WebID</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Access Granted</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {asset.members.map((member) => (
+                        <TableRow key={member.webId}>
+                          <TableCell>
+                            <div className="font-mono text-sm break-all max-w-xs">
+                              {member.webId}
+                              {member.webId === currentWebId && (
+                                <Badge variant="secondary" className="ml-2">You</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getRoleColor(member.role)}>
+                              <span className="flex items-center gap-1">
+                                {getRoleIcon(member.role)}
+                                {member.role}
+                              </span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {member.joinedAt.toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
