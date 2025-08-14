@@ -39,7 +39,8 @@ import {
   Eye,
   FileText,
   Settings,
-  UserPlus
+  UserPlus,
+  Upload
 } from 'lucide-react';
 import { 
   Dialog,
@@ -50,6 +51,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DataManager from './DataManager';
 
 interface DataSpaceDetailsProps {
   dataSpace: DataSpace;
@@ -59,6 +62,7 @@ interface DataSpaceDetailsProps {
 
 const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [editFormData, setEditFormData] = useState({
     title: dataSpace.title,
     description: dataSpace.description,
@@ -217,7 +221,7 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           Back to List
         </Button>
         
-        {isAdmin && (
+        {isAdmin && activeTab === 'overview' && (
           <div className="flex gap-2">
             {isEditing ? (
               <>
@@ -239,6 +243,25 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           </div>
         )}
       </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="members" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Members
+          </TabsTrigger>
+          <TabsTrigger value="data" className="flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Data
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* Data Space Info */}
       <Card className="bg-gradient-card shadow-card">
@@ -334,9 +357,11 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
-      {/* Members Management */}
-      <Card className="bg-gradient-card shadow-card">
+        <TabsContent value="members" className="space-y-6">
+          {/* Members Management */}
+          <Card className="bg-gradient-card shadow-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -465,6 +490,12 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
           </Table>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="data">
+          <DataManager dataSpace={dataSpace} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
