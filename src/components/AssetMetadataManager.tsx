@@ -51,21 +51,6 @@ const AssetMetadataManager = ({ asset, onUpdate }: AssetMetadataManagerProps) =>
   const [newMetadata, setNewMetadata] = useState<AddAssetMetadataInput>({
     title: '',
     description: '',
-    originalTitle: '',
-    openDataSourceLink: '',
-    dataFormat: '',
-    categories: [],
-    chargeable: false,
-    useSetting: '',
-    datasourceLanguage: '',
-    metadataLanguage: '',
-    linkedMetadata: '',
-    updateFrequency: '',
-    geographicCoverage: '',
-    geographicExpansion: '',
-    resourceSize: '',
-    resourceEncoding: '',
-    datasourceLink: '',
   });
 
   const assetService = AssetService.getInstance();
@@ -79,21 +64,6 @@ const AssetMetadataManager = ({ asset, onUpdate }: AssetMetadataManagerProps) =>
     setNewMetadata({
       title: '',
       description: '',
-      originalTitle: '',
-      openDataSourceLink: '',
-      dataFormat: '',
-      categories: [],
-      chargeable: false,
-      useSetting: '',
-      datasourceLanguage: '',
-      metadataLanguage: '',
-      linkedMetadata: '',
-      updateFrequency: '',
-      geographicCoverage: '',
-      geographicExpansion: '',
-      resourceSize: '',
-      resourceEncoding: '',
-      datasourceLink: '',
     });
   };
 
@@ -208,270 +178,42 @@ const AssetMetadataManager = ({ asset, onUpdate }: AssetMetadataManagerProps) =>
                     </DialogDescription>
                   </DialogHeader>
                   
-                  <div className="space-y-6">
-                    {/* Basic Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label htmlFor="metadata-title">Title *</Label>
+                      <Input
+                        id="metadata-title"
+                        placeholder="Asset title"
+                        value={newMetadata.title}
+                        onChange={(e) => setNewMetadata(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    
                     <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <FileText className="w-5 h-5" />
-                        Basic Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <Label htmlFor="metadata-title">Title *</Label>
-                          <Input
-                            id="metadata-title"
-                            placeholder="Asset title"
-                            value={newMetadata.title}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, title: e.target.value }))}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label>Asset Created</Label>
-                          <Input
-                            type="date"
-                            value={formatDateForInput(newMetadata.assetCreated)}
-                            onChange={(e) => handleDateChange('assetCreated', e.target.value)}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label>Asset Last Modified</Label>
-                          <Input
-                            type="date"
-                            value={formatDateForInput(newMetadata.assetLastModified)}
-                            onChange={(e) => handleDateChange('assetLastModified', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <Label>Description</Label>
-                          <Textarea
-                            placeholder="Detailed description of the asset"
-                            value={newMetadata.description || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, description: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Original Title</Label>
-                          <Input
-                            placeholder="Original title if different"
-                            value={newMetadata.originalTitle || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, originalTitle: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Open Data Source Link</Label>
-                          <Input
-                            type="url"
-                            placeholder="https://..."
-                            value={newMetadata.openDataSourceLink || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, openDataSourceLink: e.target.value }))}
-                          />
-                        </div>
-                      </div>
+                      <Label>Asset Created</Label>
+                      <Input
+                        type="date"
+                        value={formatDateForInput(newMetadata.assetCreated)}
+                        onChange={(e) => handleDateChange('assetCreated', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>Asset Last Modified</Label>
+                      <Input
+                        type="date"
+                        value={formatDateForInput(newMetadata.assetLastModified)}
+                        onChange={(e) => handleDateChange('assetLastModified', e.target.value)}
+                      />
                     </div>
 
-                    {/* Technical Information */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Database className="w-5 h-5" />
-                        Technical Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Data Format</Label>
-                          <Input
-                            placeholder="e.g., CSV, JSON, XML"
-                            value={newMetadata.dataFormat || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, dataFormat: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Resource Size</Label>
-                          <Input
-                            placeholder="e.g., 10MB, 2GB"
-                            value={newMetadata.resourceSize || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, resourceSize: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Resource Encoding</Label>
-                          <Input
-                            placeholder="e.g., UTF-8, ASCII"
-                            value={newMetadata.resourceEncoding || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, resourceEncoding: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Datasource Link</Label>
-                          <Input
-                            type="url"
-                            placeholder="https://..."
-                            value={newMetadata.datasourceLink || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, datasourceLink: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Categories */}
-                    <div>
-                      <Label>Categories</Label>
-                      <div className="flex gap-2 mt-2">
-                        <Input
-                          placeholder="Add category"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              addCategory((e.target as HTMLInputElement).value);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {newMetadata.categories?.map((category, index) => (
-                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                            {category}
-                            <button
-                              onClick={() => removeCategory(category)}
-                              className="ml-1 hover:bg-red-100 rounded-full p-0.5"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Usage & Settings */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <DollarSign className="w-5 h-5" />
-                        Usage & Settings
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Label>Chargeable</Label>
-                          <Switch
-                            checked={newMetadata.chargeable || false}
-                            onCheckedChange={(checked) => setNewMetadata(prev => ({ ...prev, chargeable: checked }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Use Setting</Label>
-                          <Input
-                            placeholder="e.g., Research only, Commercial use allowed"
-                            value={newMetadata.useSetting || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, useSetting: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Language Information */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Languages className="w-5 h-5" />
-                        Language Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Datasource Language</Label>
-                          <Input
-                            placeholder="e.g., English, German, French"
-                            value={newMetadata.datasourceLanguage || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, datasourceLanguage: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Metadata Language</Label>
-                          <Input
-                            placeholder="e.g., English, German, French"
-                            value={newMetadata.metadataLanguage || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, metadataLanguage: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Temporal Coverage */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Clock className="w-5 h-5" />
-                        Temporal Coverage
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Beginning</Label>
-                          <Input
-                            type="date"
-                            value={formatDateForInput(newMetadata.temporalCoverageBeginning)}
-                            onChange={(e) => handleDateChange('temporalCoverageBeginning', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Ending</Label>
-                          <Input
-                            type="date"
-                            value={formatDateForInput(newMetadata.temporalCoverageEnding)}
-                            onChange={(e) => handleDateChange('temporalCoverageEnding', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Update Frequency</Label>
-                          <Input
-                            placeholder="e.g., Daily, Weekly, Monthly, Annually"
-                            value={newMetadata.updateFrequency || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, updateFrequency: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Linked Metadata</Label>
-                          <Input
-                            placeholder="Reference to linked metadata"
-                            value={newMetadata.linkedMetadata || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, linkedMetadata: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Geographic Information */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <MapPin className="w-5 h-5" />
-                        Geographic Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Geographic Coverage</Label>
-                          <Input
-                            placeholder="e.g., Germany, Europe, Global"
-                            value={newMetadata.geographicCoverage || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, geographicCoverage: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Geographic Expansion</Label>
-                          <Input
-                            placeholder="e.g., City-level, Country-level, Regional"
-                            value={newMetadata.geographicExpansion || ''}
-                            onChange={(e) => setNewMetadata(prev => ({ ...prev, geographicExpansion: e.target.value }))}
-                          />
-                        </div>
-                      </div>
+                    <div className="md:col-span-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        placeholder="Detailed description of the asset"
+                        value={newMetadata.description || ''}
+                        onChange={(e) => setNewMetadata(prev => ({ ...prev, description: e.target.value }))}
+                      />
                     </div>
                   </div>
 
