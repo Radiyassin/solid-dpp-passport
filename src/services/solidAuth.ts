@@ -57,9 +57,19 @@ export class SolidAuthService {
         description: "Community-run Pod provider"
       },
       {
-        name: "SolidWeb.org",
+        name: "Inrupt PodSpaces",
+        url: "https://login.inrupt.com",
+        description: "Commercial Pod provider by Inrupt"
+      },
+      {
+        name: "SolidWeb.org", 
         url: "https://solidweb.org",
         description: "Independent Pod provider"
+      },
+      {
+        name: "Use.id",
+        url: "https://use.id",
+        description: "European Pod provider"
       }
     ];
   }

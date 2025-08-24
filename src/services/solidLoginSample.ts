@@ -13,7 +13,7 @@ import {
   getAuditLdesUrl 
 } from "./solidWorkspace";
 
-const SOLID_ISSUER = "https://solidcommunity.net";
+// Users can login with any Solid provider - no restriction to specific issuer
 const ORG_WEBID = "https://solid4dpp.solidcommunity.net/profile/card#me";
 
 /**
@@ -44,11 +44,11 @@ export class SolidLoginManager {
   }
 
   /**
-   * Start login process
+   * Start login process with any provider
    */
-  async login(): Promise<void> {
+  async loginWithProvider(issuer: string): Promise<void> {
     await login({
-      oidcIssuer: SOLID_ISSUER,
+      oidcIssuer: issuer,
       redirectUrl: new URL("/", window.location.href).toString(),
       clientName: "Digital Product Passport App",
     });
