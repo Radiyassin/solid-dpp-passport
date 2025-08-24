@@ -17,7 +17,6 @@ import {
 import { SolidAuthService } from "./solidAuth";
 import { FOAF, DCTERMS, RDF } from "@inrupt/vocab-common-rdf";
 import { DataSpaceRole, DataSpaceMember } from "./dataSpaceService";
-import { WorkspaceService } from "./workspaceService";
 
 // Custom vocabulary for Assets
 const ASSET = {
@@ -113,11 +112,9 @@ export interface AddAssetMetadataInput extends Omit<AssetMetadata, 'id' | 'creat
 export class AssetService {
   private static instance: AssetService;
   private auth: SolidAuthService;
-  private workspaceService: WorkspaceService;
 
   private constructor() {
     this.auth = SolidAuthService.getInstance();
-    this.workspaceService = WorkspaceService.getInstance();
   }
 
   static getInstance(): AssetService {

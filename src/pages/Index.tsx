@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SolidAuthService, WorkspaceService } from '@/services';
+import { SolidAuthService } from '@/services/solidAuth';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
 import { Button } from '@/components/ui/button';
@@ -12,27 +12,12 @@ const Index = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   
   const auth = SolidAuthService.getInstance();
-  const workspaceService = WorkspaceService.getInstance();
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         await auth.initializeSession();
-        const isLoggedIn = auth.isLoggedIn();
-        setIsAuthenticated(isLoggedIn);
-        
-        // If user is authenticated, provision their workspace
-        if (isLoggedIn) {
-          const userWebId = auth.getWebId();
-          if (userWebId) {
-            try {
-              await workspaceService.provisionUserWorkspace(userWebId);
-              console.log('User workspace provisioned successfully');
-            } catch (error) {
-              console.error('Failed to provision user workspace:', error);
-            }
-          }
-        }
+        setIsAuthenticated(auth.isLoggedIn());
       } catch (error) {
         console.error('Failed to initialize session:', error);
       } finally {
