@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SolidAuthService } from '@/services/solidAuth';
+import { solidLoginManager } from '@/services/solidLoginSample';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
 import { Button } from '@/components/ui/button';
@@ -16,8 +17,10 @@ const Index = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Initialize both auth services
         await auth.initializeSession();
-        setIsAuthenticated(auth.isLoggedIn());
+        const isLoggedIn = await solidLoginManager.initialize();
+        setIsAuthenticated(isLoggedIn || auth.isLoggedIn());
       } catch (error) {
         console.error('Failed to initialize session:', error);
       } finally {
