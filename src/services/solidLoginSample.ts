@@ -35,8 +35,14 @@ export class SolidLoginManager {
     if (this.session.info.isLoggedIn && this.session.info.webId) {
       console.log("User logged in:", this.session.info.webId);
       
-      // Provision workspace on login
-      await this.provisionUserWorkspace(this.session.info.webId);
+      // Try to provision workspace, but don't fail authentication if it doesn't work
+      try {
+        await this.provisionUserWorkspace(this.session.info.webId);
+      } catch (error) {
+        console.warn("Could not provision workspace (user may not have org pod access):", error);
+        // Continue with authentication even if workspace provisioning fails
+      }
+      
       return true;
     }
     
@@ -87,7 +93,7 @@ export class SolidLoginManager {
    */
   private async provisionUserWorkspace(userWebId: string): Promise<void> {
     try {
-      // First, ensure org structure exists
+      // First, ensure org structure exists (only works if user has access to org pod)
       await provisionOrgStructure(this.session);
       
       // Then provision user workspace with WAC
@@ -108,7 +114,10 @@ export class SolidLoginManager {
       
     } catch (error) {
       console.error("Error provisioning workspace:", error);
-      throw error;
+      // Only throw if it's not a permission error - users from other pods can't write to org pod
+      if (error instanceof Error && !error.message.includes('403') && !error.message.includes('Unauthorized')) {
+        throw error;
+      }
     }
   }
 
