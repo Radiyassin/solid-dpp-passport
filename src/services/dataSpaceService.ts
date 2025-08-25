@@ -240,14 +240,33 @@ export class DataSpaceService {
 
       // Log audit event for DataSpace creation
       try {
+        console.log('🔍 Attempting to log audit event for DataSpace creation...');
         const session = getDefaultSession();
+        console.log('Session info:', { 
+          isLoggedIn: session?.info?.isLoggedIn, 
+          webId: session?.info?.webId 
+        });
+        
         if (session && session.info.isLoggedIn) {
           const userPodBase = webId.split('/profile')[0] + '/';
+          console.log('🔍 Calling auditService.logDataSpaceOperation with:', {
+            action: 'Create',
+            id,
+            webId,
+            userPodBase
+          });
+          
           await this.auditService.logDataSpaceOperation(session, 'Create', id, webId, userPodBase);
           console.log('✅ Audit event logged for DataSpace creation');
+        } else {
+          console.warn('⚠️ Session not available for audit logging');
         }
       } catch (auditError) {
-        console.warn('⚠️ Failed to log audit event:', auditError);
+        console.error('❌ Failed to log audit event:', auditError);
+        console.error('Audit error details:', {
+          message: auditError instanceof Error ? auditError.message : 'Unknown error',
+          stack: auditError instanceof Error ? auditError.stack : undefined
+        });
       }
 
       return result;

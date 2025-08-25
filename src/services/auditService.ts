@@ -240,8 +240,23 @@ export class AuditService {
     userWebId: string,
     userPodBase: string
   ): Promise<void> {
+    console.log('🔍 AuditService.logDataSpaceOperation called with:', {
+      action,
+      dataSpaceId,
+      userWebId,
+      userPodBase,
+      sessionAvailable: !!session
+    });
+    
     const objectIri = `${userPodBase}dataspaces/${dataSpaceId}.ttl`;
     const targetIri = `${userPodBase}dataspaces/`;
+
+    console.log('🔍 Will create audit event with:', {
+      actorWebId: userWebId,
+      action,
+      objectIri,
+      targetIri
+    });
 
     await this.appendAuditEvent(session, {
       actorWebId: userWebId,
