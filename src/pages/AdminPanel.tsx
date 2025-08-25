@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { SolidAuthService } from '@/services/solidAuth';
 import SolidLogin from '@/components/SolidLogin';
 import AdminDPPManager from '@/components/AdminDPPManager';
+import OrgPodSetup from '@/components/OrgPodSetup';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, LogOut, Home } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Shield, LogOut, Home, Settings, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminPanel = () => {
@@ -71,7 +73,7 @@ const AdminPanel = () => {
                 <div>
                   <CardTitle className="text-2xl">Admin Panel</CardTitle>
                   <CardDescription>
-                    Manage Digital Product Passports
+                    Manage Digital Product Passports and System Configuration
                   </CardDescription>
                 </div>
               </div>
@@ -101,8 +103,27 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Admin DPP Manager */}
-        <AdminDPPManager />
+        {/* Admin Tabs */}
+        <Tabs defaultValue="dpps" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+            <TabsTrigger value="dpps" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              DPP Manager
+            </TabsTrigger>
+            <TabsTrigger value="setup" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Org Setup
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dpps">
+            <AdminDPPManager />
+          </TabsContent>
+
+          <TabsContent value="setup">
+            <OrgPodSetup />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -73,6 +73,8 @@ export class AuditService {
       const filename = this.generateAuditFilename(timestamp);
       const auditFileUrl = `${AUDIT_LDES_URL}${filename}`;
 
+      console.log('📝 Attempting to save audit event to:', auditFileUrl);
+
       // Create the ActivityStreams audit entry
       let dataset = createSolidDataset();
       let auditThing = createThing({ url: auditFileUrl });
@@ -90,9 +92,21 @@ export class AuditService {
       // Save the audit entry to the org Pod
       await saveSolidDatasetAt(auditFileUrl, dataset, { fetch: session.fetch });
       
-      console.log('✅ Audit event saved to:', auditFileUrl);
+      console.log('✅ Audit event saved successfully to:', auditFileUrl);
     } catch (error) {
       console.error('❌ Failed to save audit event:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        status: (error as any)?.status,
+        statusText: (error as any)?.statusText,
+        url: (error as any)?.url
+      });
+      
+      // Check if it's a permission error
+      if ((error as any)?.status === 403 || (error as any)?.status === 401) {
+        console.warn('⚠️ Permission denied writing to org Pod - user may not have write access');
+      }
+      
       // Don't throw - we don't want audit failures to break user operations
       // Just log the error and continue
     }
