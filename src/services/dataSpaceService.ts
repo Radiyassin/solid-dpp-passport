@@ -6,6 +6,7 @@ import {
   addStringNoLocale,
   addDatetime,
   addBoolean,
+  removeBoolean,
   addStringWithLocale,
   setThing,
   getThing,
@@ -454,18 +455,24 @@ export class DataSpaceService {
     const dataSpaceUrl = this.getDataSpaceUrl(id);
     const fetch = this.auth.getFetch();
     
-    let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
-    let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${id}`);
-    
-    if (!dataSpaceThing) {
-      throw new Error('DataSpace not found');
-    }
+    try {
+      let dataset = await getSolidDataset(dataSpaceUrl, { fetch });
+      let dataSpaceThing = getThing(dataset, `${dataSpaceUrl}#${id}`);
+      
+      if (!dataSpaceThing) {
+        throw new Error('DataSpace not found');
+      }
 
-    // Mark as inactive instead of deleting
-    dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, false);
-    dataset = setThing(dataset, dataSpaceThing);
-    
-    await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+      // Remove the existing isActive property and set it to false
+      dataSpaceThing = removeBoolean(dataSpaceThing, DS.isActive, true);
+      dataSpaceThing = addBoolean(dataSpaceThing, DS.isActive, false);
+      dataset = setThing(dataset, dataSpaceThing);
+      
+      await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+    } catch (error) {
+      console.error('Error deleting data space:', error);
+      throw new Error(`Failed to delete DataSpace: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async addMetadata(dataSpaceId: string, metadata: AddMetadataInput): Promise<void> {
