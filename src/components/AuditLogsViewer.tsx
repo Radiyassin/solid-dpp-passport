@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { SolidAuthService } from '@/services/solidAuth';
+import AuditTestButton from './AuditTestButton';
 import { 
   getSolidDataset, 
   getContainedResourceUrlAll,
@@ -221,14 +222,17 @@ const AuditLogsViewer = () => {
                 </CardDescription>
               </div>
             </div>
-            <Button 
-              onClick={loadAuditLogs} 
-              disabled={isLoading}
-              variant="outline"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <AuditTestButton />
+              <Button 
+                onClick={loadAuditLogs} 
+                disabled={isLoading}
+                variant="outline"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
