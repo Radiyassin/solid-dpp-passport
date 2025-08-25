@@ -3,15 +3,19 @@ import { SolidAuthService } from '@/services/solidAuth';
 import { AuditService } from '@/services/auditService';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
+import AuditLogsViewer from '@/components/AuditLogsViewer';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Settings, Database } from 'lucide-react';
+import { Settings, Database, LogOut } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { getDefaultSession } from '@inrupt/solid-client-authn-browser';
+
+const ORG_WEBID = "https://solid4dpp.solidcommunity.net/profile/card#me";
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   
   const auth = SolidAuthService.getInstance();
   const auditService = AuditService.getInstance();
@@ -23,8 +27,12 @@ const Index = () => {
         const isLoggedIn = auth.isLoggedIn();
         setIsAuthenticated(isLoggedIn);
         
-        // Initialize audit system when user logs in
+        // Check if user is admin (org WebID)
         if (isLoggedIn) {
+          const webId = auth.getWebId();
+          const isAdmin = webId === ORG_WEBID;
+          setIsAdminUser(isAdmin);
+          
           try {
             const session = getDefaultSession();
             await auditService.protectAuditLdes(session);
@@ -48,8 +56,10 @@ const Index = () => {
     // The actual auth state change will be handled by the redirect
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await auth.logout();
     setIsAuthenticated(false);
+    setIsAdminUser(false);
   };
 
   if (isInitializing) {
@@ -65,6 +75,39 @@ const Index = () => {
 
   if (!isAuthenticated) {
     return <SolidLogin onLoginAttempt={handleLoginAttempt} />;
+  }
+
+  // Show admin audit logs view for org WebID
+  if (isAdminUser) {
+    return (
+      <div className="min-h-screen bg-gradient-secondary">
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <Link to="/dataspaces">
+            <Button variant="outline" size="sm">
+              <Database className="w-4 h-4 mr-2" />
+              Data Spaces
+            </Button>
+          </Link>
+          <Link to="/admin">
+            <Button variant="outline" size="sm">
+              <Settings className="w-4 h-4 mr-2" />
+              Admin Panel
+            </Button>
+          </Link>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+        <div className="container mx-auto p-6 pt-20">
+          <AuditLogsViewer />
+        </div>
+      </div>
+    );
   }
 
   return (
