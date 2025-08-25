@@ -33,12 +33,15 @@ const Index = () => {
           const isAdmin = webId === ORG_WEBID;
           setIsAdminUser(isAdmin);
           
-          try {
-            const session = getDefaultSession();
-            await auditService.protectAuditLdes(session);
-            console.log('✅ Audit system initialized');
-          } catch (auditError) {
-            console.warn('⚠️ Audit system initialization failed:', auditError);
+          // Setup ACL if user is admin
+          if (isAdmin) {
+            try {
+              const session = getDefaultSession();
+              await auditService.ensureAuditAcl(session);
+              console.log('✅ Audit ACL configured');
+            } catch (auditError) {
+              console.warn('⚠️ Audit ACL setup failed:', auditError);
+            }
           }
         }
       } catch (error) {

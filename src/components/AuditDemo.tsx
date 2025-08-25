@@ -78,7 +78,7 @@ const AuditDemo = () => {
         throw new Error('User not authenticated');
       }
 
-      await auditService.protectAuditLdes(session);
+      await auditService.ensureAuditAcl(session);
       
       toast({
         title: 'Audit System Setup',

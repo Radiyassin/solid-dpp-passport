@@ -12,6 +12,7 @@ import {
   setAgentResourceAccess,
   saveAclFor,
   createContainerAt,
+  overwriteFile,
 } from "@inrupt/solid-client";
 import { Session } from "@inrupt/solid-client-authn-browser";
 import { RDF, DCTERMS } from "@inrupt/vocab-common-rdf";
@@ -113,21 +114,45 @@ export class AuditService {
   }
 
   /**
-   * Sets up ACL protection for the audit LDES container
-   * Note: Simplified version - manual ACL setup may be needed for full protection
+   * Sets up ACL protection for the audit LDES container with proper permissions
    */
-  async protectAuditLdes(session: Session, adminWebIds: string[] = [ORG_WEBID]): Promise<void> {
-    console.log('🔒 Setting up basic protection for audit LDES...');
+  async ensureAuditAcl(session: Session): Promise<void> {
+    console.log('🔒 Setting up ACL for audit LDES...');
     
     try {
       // Ensure the audit container exists first
       await this.ensureAuditContainer(session);
-      console.log('✅ Audit LDES container structure ready');
-      console.log('⚠️  Manual ACL setup recommended for full security');
-      console.log(`Admin WebIDs that should have access: ${adminWebIds.join(', ')}`);
+      
+      const ACL_URL = AUDIT_LDES_URL + ".acl";
+      const aclTurtle = `
+@prefix acl:  <http://www.w3.org/ns/auth/acl#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+<#owner>
+  a acl:Authorization ;
+  acl:agent   <${ORG_WEBID}> ;
+  acl:accessTo <./> ;
+  acl:default  <./> ;
+  acl:mode acl:Read, acl:Write, acl:Control .
+
+<#appenders>
+  a acl:Authorization ;
+  acl:agentClass foaf:Agent ;   # any logged-in WebID
+  acl:accessTo <./> ;
+  acl:default  <./> ;
+  acl:mode acl:Append .
+`.trim();
+
+      await overwriteFile(
+        ACL_URL,
+        new Blob([aclTurtle], { type: "text/turtle" }) as any,
+        { contentType: "text/turtle", fetch: session.fetch }
+      );
+      
+      console.log('✅ ACL configured for audit LDES');
     } catch (error) {
-      console.error('❌ Failed to setup audit LDES:', error);
-      console.log('⚠️ Continuing without protection...');
+      console.error('❌ Failed to setup audit ACL:', error);
+      throw error;
     }
   }
 
