@@ -1,23 +1,38 @@
 import { useState, useEffect } from 'react';
 import { SolidAuthService } from '@/services/solidAuth';
+import { AuditService } from '@/services/auditService';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Settings, Database } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { getDefaultSession } from '@inrupt/solid-client-authn-browser';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   
   const auth = SolidAuthService.getInstance();
+  const auditService = AuditService.getInstance();
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         await auth.initializeSession();
-        setIsAuthenticated(auth.isLoggedIn());
+        const isLoggedIn = auth.isLoggedIn();
+        setIsAuthenticated(isLoggedIn);
+        
+        // Initialize audit system when user logs in
+        if (isLoggedIn) {
+          try {
+            const session = getDefaultSession();
+            await auditService.protectAuditLdes(session);
+            console.log('✅ Audit system initialized');
+          } catch (auditError) {
+            console.warn('⚠️ Audit system initialization failed:', auditError);
+          }
+        }
       } catch (error) {
         console.error('Failed to initialize session:', error);
       } finally {

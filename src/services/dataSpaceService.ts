@@ -17,7 +17,9 @@ import {
   removeThing,
   getSourceUrl,
 } from "@inrupt/solid-client";
+import { getDefaultSession } from "@inrupt/solid-client-authn-browser";
 import { SolidAuthService } from "./solidAuth";
+import { AuditService } from "./auditService";
 import { FOAF, DCTERMS, RDF } from "@inrupt/vocab-common-rdf";
 
 // Custom vocabulary for Data Spaces
@@ -132,9 +134,11 @@ export interface AddMetadataInput extends Omit<DataSpaceMetadata, 'id' | 'create
 export class DataSpaceService {
   private static instance: DataSpaceService;
   private auth: SolidAuthService;
+  private auditService: AuditService;
 
   private constructor() {
     this.auth = SolidAuthService.getInstance();
+    this.auditService = AuditService.getInstance();
   }
 
   static getInstance(): DataSpaceService {
@@ -233,6 +237,19 @@ export class DataSpaceService {
 
       const result = this.parseDataSpace(id, dataset);
       console.log('✅ DataSpace creation completed successfully:', result);
+
+      // Log audit event for DataSpace creation
+      try {
+        const session = getDefaultSession();
+        if (session && session.info.isLoggedIn) {
+          const userPodBase = webId.split('/profile')[0] + '/';
+          await this.auditService.logDataSpaceOperation(session, 'Create', id, webId, userPodBase);
+          console.log('✅ Audit event logged for DataSpace creation');
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log audit event:', auditError);
+      }
+
       return result;
     } catch (error) {
       console.error('❌ DETAILED ERROR creating DataSpace:', {
@@ -396,6 +413,19 @@ export class DataSpaceService {
     dataset = setThing(dataset, dataSpaceThing);
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
 
+    // Log audit event for DataSpace update
+    try {
+      const session = getDefaultSession();
+      const webId = this.auth.getWebId();
+      if (session && session.info.isLoggedIn && webId) {
+        const userPodBase = webId.split('/profile')[0] + '/';
+        await this.auditService.logDataSpaceOperation(session, 'Update', id, webId, userPodBase);
+        console.log('✅ Audit event logged for DataSpace update');
+      }
+    } catch (auditError) {
+      console.warn('⚠️ Failed to log audit event:', auditError);
+    }
+
     return this.parseDataSpace(id, dataset);
   }
 
@@ -469,6 +499,19 @@ export class DataSpaceService {
       dataset = setThing(dataset, dataSpaceThing);
       
       await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+      
+      // Log audit event for DataSpace deletion
+      try {
+        const session = getDefaultSession();
+        const webId = this.auth.getWebId();
+        if (session && session.info.isLoggedIn && webId) {
+          const userPodBase = webId.split('/profile')[0] + '/';
+          await this.auditService.logDataSpaceOperation(session, 'Delete', id, webId, userPodBase);
+          console.log('✅ Audit event logged for DataSpace deletion');
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log audit event:', auditError);
+      }
     } catch (error) {
       console.error('Error deleting data space:', error);
       throw new Error(`Failed to delete DataSpace: ${error instanceof Error ? error.message : 'Unknown error'}`);

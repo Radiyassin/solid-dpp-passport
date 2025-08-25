@@ -14,7 +14,9 @@ import {
   getThingAll,
   removeThing,
 } from "@inrupt/solid-client";
+import { getDefaultSession } from "@inrupt/solid-client-authn-browser";
 import { SolidAuthService } from "./solidAuth";
+import { AuditService } from "./auditService";
 import { FOAF, DCTERMS, RDF } from "@inrupt/vocab-common-rdf";
 import { DataSpaceRole, DataSpaceMember } from "./dataSpaceService";
 
@@ -112,9 +114,11 @@ export interface AddAssetMetadataInput extends Omit<AssetMetadata, 'id' | 'creat
 export class AssetService {
   private static instance: AssetService;
   private auth: SolidAuthService;
+  private auditService: AuditService;
 
   private constructor() {
     this.auth = SolidAuthService.getInstance();
+    this.auditService = AuditService.getInstance();
   }
 
   static getInstance(): AssetService {
@@ -183,7 +187,22 @@ export class AssetService {
       
       await saveSolidDatasetAt(assetUrl, dataset, { fetch });
 
-      return this.parseAsset(dataSpaceId, id, dataset);
+      const result = this.parseAsset(dataSpaceId, id, dataset);
+
+      // Log audit event for Asset creation
+      try {
+        const session = getDefaultSession();
+        if (session && session.info.isLoggedIn && webId) {
+          const userPodBase = webId.split('/profile')[0] + '/';
+          const assetPath = `dataspaces/${dataSpaceId}/assets/${id}.ttl`;
+          await this.auditService.logAssetOperation(session, 'Create', assetPath, webId, userPodBase);
+          console.log('✅ Audit event logged for Asset creation');
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log audit event:', auditError);
+      }
+
+      return result;
     } catch (error) {
       console.error('Error creating asset:', error);
       throw new Error(`Failed to create Asset: ${error instanceof Error ? error.message : 'Unknown error'}`);
