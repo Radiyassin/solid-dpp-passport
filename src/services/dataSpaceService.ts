@@ -628,6 +628,18 @@ export class DataSpaceService {
     
     dataset = setThing(dataset, metadataThing);
     await saveSolidDatasetAt(dataSpaceUrl, dataset, { fetch });
+
+    // Log audit event for metadata addition
+    try {
+      const session = getDefaultSession();
+      if (session && session.info.isLoggedIn && currentWebId) {
+        const userPodBase = currentWebId.split('/profile')[0] + '/';
+        await this.auditService.logDataSpaceOperation(session, 'Create', `${dataSpaceId}#${metadataId}`, currentWebId, userPodBase);
+        console.log('✅ Audit event logged for DataSpace metadata addition');
+      }
+    } catch (auditError) {
+      console.warn('⚠️ Failed to log audit event:', auditError);
+    }
   }
 
   async removeMetadata(dataSpaceId: string, metadataId: string): Promise<void> {

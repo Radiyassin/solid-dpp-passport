@@ -293,6 +293,20 @@ export class AssetService {
     dataset = setThing(dataset, assetThing);
     await saveSolidDatasetAt(assetUrl, dataset, { fetch });
 
+    // Log audit event for Asset update
+    try {
+      const session = getDefaultSession();
+      const webId = this.auth.getWebId();
+      if (session && session.info.isLoggedIn && webId) {
+        const userPodBase = webId.split('/profile')[0] + '/';
+        const assetPath = `dataspaces/${dataSpaceId}/assets/${assetId}.ttl`;
+        await this.auditService.logAssetOperation(session, 'Update', assetPath, webId, userPodBase);
+        console.log('✅ Audit event logged for Asset update');
+      }
+    } catch (auditError) {
+      console.warn('⚠️ Failed to log audit event:', auditError);
+    }
+
     return this.parseAsset(dataSpaceId, assetId, dataset);
   }
 
@@ -379,6 +393,19 @@ export class AssetService {
     
     dataset = setThing(dataset, metadataThing);
     await saveSolidDatasetAt(assetUrl, dataset, { fetch });
+
+    // Log audit event for metadata addition
+    try {
+      const session = getDefaultSession();
+      if (session && session.info.isLoggedIn && currentWebId) {
+        const userPodBase = currentWebId.split('/profile')[0] + '/';
+        const assetPath = `dataspaces/${dataSpaceId}/assets/${assetId}.ttl#${metadataId}`;
+        await this.auditService.logAssetOperation(session, 'Create', assetPath, currentWebId, userPodBase);
+        console.log('✅ Audit event logged for Asset metadata addition');
+      }
+    } catch (auditError) {
+      console.warn('⚠️ Failed to log audit event:', auditError);
+    }
   }
 
   async removeAssetMetadata(dataSpaceId: string, assetId: string, metadataId: string): Promise<void> {
