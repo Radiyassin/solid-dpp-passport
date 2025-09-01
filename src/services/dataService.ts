@@ -183,12 +183,12 @@ export class DataService {
       try {
         const session = getDefaultSession();
         const userPodBase = webId.split('/profile/card#me')[0] + '/';
+        const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
         await AuditService.getInstance().logDataSpaceOperation(
-          session,
           'Create',
           dataId,
           webId,
-          userPodBase
+          userName
         );
         console.log('✅ Data upload logged to audit');
       } catch (auditError) {

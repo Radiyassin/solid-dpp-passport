@@ -256,7 +256,8 @@ export class DataSpaceService {
             userPodBase
           });
           
-          await this.auditService.logDataSpaceOperation(session, 'Create', id, webId, userPodBase);
+          const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+          await this.auditService.logDataSpaceOperation('Create', id, webId, userName);
           console.log('✅ Audit event logged for DataSpace creation');
         } else {
           console.warn('⚠️ Session not available for audit logging');
@@ -438,7 +439,8 @@ export class DataSpaceService {
       const webId = this.auth.getWebId();
       if (session && session.info.isLoggedIn && webId) {
         const userPodBase = webId.split('/profile')[0] + '/';
-        await this.auditService.logDataSpaceOperation(session, 'Update', id, webId, userPodBase);
+        const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        await this.auditService.logDataSpaceOperation('Update', id, webId, userName);
         console.log('✅ Audit event logged for DataSpace update');
       }
     } catch (auditError) {
@@ -525,7 +527,8 @@ export class DataSpaceService {
         const webId = this.auth.getWebId();
         if (session && session.info.isLoggedIn && webId) {
           const userPodBase = webId.split('/profile')[0] + '/';
-          await this.auditService.logDataSpaceOperation(session, 'Delete', id, webId, userPodBase);
+          const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+          await this.auditService.logDataSpaceOperation('Delete', id, webId, userName);
           console.log('✅ Audit event logged for DataSpace deletion');
         }
       } catch (auditError) {
@@ -634,7 +637,8 @@ export class DataSpaceService {
       const session = getDefaultSession();
       if (session && session.info.isLoggedIn && currentWebId) {
         const userPodBase = currentWebId.split('/profile')[0] + '/';
-        await this.auditService.logDataSpaceOperation(session, 'Create', `${dataSpaceId}#${metadataId}`, currentWebId, userPodBase);
+        const userName = currentWebId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        await this.auditService.logDataSpaceOperation('Update', `${dataSpaceId} metadata`, currentWebId, userName);
         console.log('✅ Audit event logged for DataSpace metadata addition');
       }
     } catch (auditError) {

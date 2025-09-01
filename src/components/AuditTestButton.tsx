@@ -20,12 +20,15 @@ const AuditTestButton = () => {
         throw new Error('User not authenticated');
       }
 
-      // Test direct audit event
-      await auditService.appendAuditEvent(session, {
-        actorWebId: webId,
+      // Test audit event with new JSON system
+      const userName = webId.split('/profile')[0].split('/').pop() || 'Test User';
+      await auditService.logEvent({
+        userId: webId,
+        userName,
         action: 'Create',
-        objectIri: `${webId.split('/profile')[0]}/test-dataspace.ttl`,
-        targetIri: `${webId.split('/profile')[0]}/dataspaces/`,
+        resourceType: 'DataSpace',
+        resourceName: 'Test DataSpace',
+        description: `${userName} created a test dataspace for audit testing`,
       });
 
       toast({

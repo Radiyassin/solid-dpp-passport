@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AuditService, AuditEventInput } from '@/services/auditService';
 import { SolidAuthService } from '@/services/solidAuth';
@@ -14,14 +15,17 @@ import {
   Shield, 
   Database,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  User,
+  Trash2
 } from 'lucide-react';
 
 const AuditDemo = () => {
   const [demoEvent, setDemoEvent] = useState<Partial<AuditEventInput>>({
     action: 'Create',
-    objectIri: 'https://example.solidcommunity.net/dataspaces/ds-123/assets/asset-456.ttl',
-    targetIri: 'https://example.solidcommunity.net/dataspaces/ds-123/assets/',
+    resourceType: 'DataSpace',
+    resourceName: 'Test DataSpace',
+    description: 'Test user created a new dataspace',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [auditStatus, setAuditStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -41,25 +45,29 @@ const AuditDemo = () => {
         throw new Error('User not authenticated');
       }
 
+      const userName = userWebId.split('/profile')[0].split('/').pop() || 'Unknown User';
+
       const completeEvent: AuditEventInput = {
-        actorWebId: userWebId,
+        userId: userWebId,
+        userName,
         action: demoEvent.action as any,
-        objectIri: demoEvent.objectIri || '',
-        targetIri: demoEvent.targetIri || '',
+        resourceType: demoEvent.resourceType || 'Resource',
+        resourceName: demoEvent.resourceName || 'Test Resource',
+        description: demoEvent.description || `${userName} performed ${demoEvent.action?.toLowerCase()} on ${demoEvent.resourceType}`,
       };
 
-      await auditService.appendAuditEvent(session, completeEvent);
-      
+      await auditService.logEvent(completeEvent);
+
       setAuditStatus('success');
       toast({
         title: 'Audit Event Created',
-        description: 'Demo audit event has been logged to the organization Pod.',
+        description: 'Test audit event has been logged successfully.',
       });
     } catch (error) {
-      console.error('Error creating audit event:', error);
+      console.error('Failed to create test audit event:', error);
       setAuditStatus('error');
       toast({
-        title: 'Audit Failed',
+        title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to create audit event',
         variant: 'destructive',
       });
@@ -68,183 +76,178 @@ const AuditDemo = () => {
     }
   };
 
-  const handleSetupAuditSystem = async () => {
-    setIsLoading(true);
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'Login': return <User className="w-4 h-4" />;
+      case 'Create': return <FileText className="w-4 h-4" />;
+      case 'Update': return <Activity className="w-4 h-4" />;
+      case 'Delete': return <Trash2 className="w-4 h-4" />;
+      case 'View': return <Activity className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
+    }
+  };
 
-    try {
-      const session = getDefaultSession();
-      
-      if (!session || !session.info.isLoggedIn) {
-        throw new Error('User not authenticated');
-      }
+  const getStatusIcon = () => {
+    switch (auditStatus) {
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-600" />;
+      default:
+        return <Database className="w-5 h-5 text-blue-600" />;
+    }
+  };
 
-      await auditService.ensureAuditAcl(session);
-      
-      toast({
-        title: 'Audit System Setup',
-        description: 'Audit system has been initialized successfully.',
-      });
-    } catch (error) {
-      console.error('Error setting up audit system:', error);
-      toast({
-        title: 'Setup Failed',
-        description: error instanceof Error ? error.message : 'Failed to setup audit system',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+  const getStatusMessage = () => {
+    switch (auditStatus) {
+      case 'success':
+        return 'Audit event created successfully!';
+      case 'error':
+        return 'Failed to create audit event.';
+      default:
+        return 'Ready to test audit logging.';
     }
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gradient-card shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Audit System Demo
-          </CardTitle>
-          <CardDescription>
-            Test the centralized audit logging system that tracks all user actions to the organization Pod.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* System Info */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="bg-gradient-subtle">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Organization Pod
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  https://solid4dpp.solidcommunity.net/
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Audit logs: /org/audit/ldes/
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-subtle">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Activity className="w-4 h-4" />
-                  Current User
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground break-all">
-                  {auth.getWebId() || 'Not authenticated'}
-                </p>
-              </CardContent>
-            </Card>
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center shadow-glow">
+            <Activity className="w-5 h-5 text-white" />
           </div>
-
-          {/* Setup Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">1. Initialize Audit System</h3>
-            <Button 
-              onClick={handleSetupAuditSystem}
-              disabled={isLoading}
-              className="w-full"
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Setup Audit Container & Permissions
-            </Button>
-            <p className="text-sm text-muted-foreground">
-              This creates the audit directory structure and sets up access permissions.
-            </p>
+          <div>
+            <CardTitle>Audit System Demo</CardTitle>
+            <CardDescription>
+              Test the JSON-based audit logging system
+            </CardDescription>
           </div>
+        </div>
+      </CardHeader>
 
-          {/* Demo Event Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">2. Test Audit Event</h3>
-            
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="action">Action Type</Label>
-                <select
-                  id="action"
-                  value={demoEvent.action}
-                  onChange={(e) => setDemoEvent(prev => ({ ...prev, action: e.target.value as any }))}
-                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
-                >
-                  <option value="Create">Create</option>
-                  <option value="Update">Update</option>
-                  <option value="Delete">Delete</option>
-                  <option value="PermissionChange">Permission Change</option>
-                </select>
-              </div>
+      <CardContent className="space-y-6">
+        {/* Status Display */}
+        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+          {getStatusIcon()}
+          <span className="text-sm font-medium">{getStatusMessage()}</span>
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="objectIri">Object IRI</Label>
-                <Input
-                  id="objectIri"
-                  value={demoEvent.objectIri}
-                  onChange={(e) => setDemoEvent(prev => ({ ...prev, objectIri: e.target.value }))}
-                  placeholder="https://user.pod/resource.ttl"
-                />
-              </div>
+        {/* Event Configuration */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="action">Action Type</Label>
+              <Select
+                value={demoEvent.action}
+                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, action: value as any }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Login">Login</SelectItem>
+                  <SelectItem value="Create">Create</SelectItem>
+                  <SelectItem value="Update">Update</SelectItem>
+                  <SelectItem value="Delete">Delete</SelectItem>
+                  <SelectItem value="View">View</SelectItem>
+                  <SelectItem value="Interaction">Interaction</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="targetIri">Target Container IRI</Label>
-              <Input
-                id="targetIri"
-                value={demoEvent.targetIri}
-                onChange={(e) => setDemoEvent(prev => ({ ...prev, targetIri: e.target.value }))}
-                placeholder="https://user.pod/container/"
-              />
+              <Label htmlFor="resourceType">Resource Type</Label>
+              <Select
+                value={demoEvent.resourceType}
+                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, resourceType: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DataSpace">DataSpace</SelectItem>
+                  <SelectItem value="Asset">Asset</SelectItem>
+                  <SelectItem value="Authentication">Authentication</SelectItem>
+                  <SelectItem value="UI Element">UI Element</SelectItem>
+                  <SelectItem value="File">File</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <Button 
-              onClick={handleTestAudit}
-              disabled={isLoading}
-              className="w-full"
-            >
-              {auditStatus === 'success' && <CheckCircle className="w-4 h-4 mr-2" />}
-              {auditStatus === 'error' && <AlertCircle className="w-4 h-4 mr-2" />}
-              {auditStatus === 'idle' && <FileText className="w-4 h-4 mr-2" />}
-              Create Audit Event
-            </Button>
           </div>
 
-          {/* Instructions */}
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold mb-2">How It Works:</h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• When users perform actions (create/update/delete), audit events are automatically logged</li>
-              <li>• Events are stored in ActivityStreams format as TTL files</li>
-              <li>• All events are centralized in the organization Pod at /org/audit/ldes/</li>
-              <li>• Only admin WebIDs have access to read the audit logs</li>
-              <li>• File names use ISO timestamps for chronological ordering</li>
-            </ul>
-          </div>
-
-          {/* Sample Output */}
           <div className="space-y-2">
-            <Label>Sample Audit Event Format:</Label>
-            <Textarea
-              readOnly
-              value={`@prefix as: <https://www.w3.org/ns/activitystreams#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-
-<>
-  a as:${demoEvent.action || 'Create'} ;
-  as:actor <${auth.getWebId() || 'USER_WEBID'}> ;
-  as:object <${demoEvent.objectIri || 'OBJECT_IRI'}> ;
-  as:target <${demoEvent.targetIri || 'TARGET_IRI'}> ;
-  dct:created "${new Date().toISOString()}"^^<http://www.w3.org/2001/XMLSchema#dateTime> .`}
-              className="font-mono text-xs"
-              rows={8}
+            <Label htmlFor="resourceName">Resource Name</Label>
+            <Input
+              id="resourceName"
+              value={demoEvent.resourceName}
+              onChange={(e) => setDemoEvent(prev => ({ ...prev, resourceName: e.target.value }))}
+              placeholder="e.g., My DataSpace, asset-123, login-button"
             />
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={demoEvent.description}
+              onChange={(e) => setDemoEvent(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Human-readable description of the action"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="space-y-3">
+          <Label>Event Preview</Label>
+          <div className="border rounded-lg p-4 bg-muted/30">
+            <div className="flex items-center gap-2 mb-2">
+              {getActionIcon(demoEvent.action || 'Create')}
+              <span className="font-medium">{demoEvent.action}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-sm bg-secondary px-2 py-1 rounded">
+                {demoEvent.resourceType}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {demoEvent.description || `User performed ${demoEvent.action?.toLowerCase()} on ${demoEvent.resourceType} "${demoEvent.resourceName}"`}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <Button 
+            onClick={handleTestAudit}
+            disabled={isLoading || !auth.isLoggedIn()}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <>
+                <Activity className="w-4 h-4 mr-2 animate-spin" />
+                Creating Event...
+              </>
+            ) : (
+              <>
+                <Database className="w-4 h-4 mr-2" />
+                Create Test Event
+              </>
+            )}
+          </Button>
+        </div>
+
+        {!auth.isLoggedIn() && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                Please log in to test audit logging functionality.
+              </span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

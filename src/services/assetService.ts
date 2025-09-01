@@ -193,9 +193,8 @@ export class AssetService {
       try {
         const session = getDefaultSession();
         if (session && session.info.isLoggedIn && webId) {
-          const userPodBase = webId.split('/profile')[0] + '/';
-          const assetPath = `dataspaces/${dataSpaceId}/assets/${id}.ttl`;
-          await this.auditService.logAssetOperation(session, 'Create', assetPath, webId, userPodBase);
+          const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+          await this.auditService.logAssetOperation('Create', id, webId, userName);
           console.log('✅ Audit event logged for Asset creation');
         }
       } catch (auditError) {
@@ -298,9 +297,8 @@ export class AssetService {
       const session = getDefaultSession();
       const webId = this.auth.getWebId();
       if (session && session.info.isLoggedIn && webId) {
-        const userPodBase = webId.split('/profile')[0] + '/';
-        const assetPath = `dataspaces/${dataSpaceId}/assets/${assetId}.ttl`;
-        await this.auditService.logAssetOperation(session, 'Update', assetPath, webId, userPodBase);
+        const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        await this.auditService.logAssetOperation('Update', assetId, webId, userName);
         console.log('✅ Audit event logged for Asset update');
       }
     } catch (auditError) {
@@ -398,9 +396,8 @@ export class AssetService {
     try {
       const session = getDefaultSession();
       if (session && session.info.isLoggedIn && currentWebId) {
-        const userPodBase = currentWebId.split('/profile')[0] + '/';
-        const assetPath = `dataspaces/${dataSpaceId}/assets/${assetId}.ttl#${metadataId}`;
-        await this.auditService.logAssetOperation(session, 'Create', assetPath, currentWebId, userPodBase);
+        const userName = currentWebId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        await this.auditService.logAssetOperation('Update', `${assetId} metadata`, currentWebId, userName);
         console.log('✅ Audit event logged for Asset metadata addition');
       }
     } catch (auditError) {

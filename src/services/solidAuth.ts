@@ -26,6 +26,17 @@ export class SolidAuthService {
       redirectUrl: new URL("/", window.location.href).toString(),
       clientName: "Digital Product Passport",
     });
+    
+    // Log the login after successful authentication
+    setTimeout(async () => {
+      const session = getDefaultSession();
+      if (session.info.isLoggedIn && session.info.webId) {
+        const { AuditService } = await import('./auditService');
+        const auditService = AuditService.getInstance();
+        const userName = session.info.webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        await auditService.logLogin(session.info.webId, userName);
+      }
+    }, 1000); // Small delay to ensure session is fully established
   }
 
   async logout(): Promise<void> {

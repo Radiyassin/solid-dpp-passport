@@ -41,39 +41,31 @@ export const AuditActionLogger: React.FC<AuditActionLoggerProps> = ({ children }
         }
 
         const target = event.target as HTMLElement;
-        const actionType = target.getAttribute('data-action') || 'interaction';
-        const resourcePath = target.getAttribute('data-resource') || window.location.pathname;
-        
-        // Only log meaningful actions
         const actionText = target.textContent?.trim() || target.getAttribute('aria-label') || target.tagName;
         
-        console.log('🔍 Attempting to log user interaction:', {
+        // Extract user name from webId
+        const userName = webId.split('/profile')[0].split('/').pop() || 'Unknown User';
+        
+        console.log('🔍 Logging user interaction:', {
           webId,
+          userName,
           element: target.tagName,
           actionText,
-          actionType,
-          resourcePath,
-          timestamp: new Date().toISOString()
+          page: window.location.pathname
         });
         
-        // Log the interaction
-        const userPodBase = webId.split('/profile')[0] + '/';
-        await auditService.appendAuditEvent(session, {
-          actorWebId: webId,
-          action: 'Create', // Generic action for user interactions
-          objectIri: `${userPodBase}interactions/${Date.now()}-${actionText.replace(/\s+/g, '-').toLowerCase()}`,
-          targetIri: `${window.location.origin}${resourcePath}`,
-        });
+        // Log the interaction using the new JSON-based service
+        await auditService.logInteraction(
+          'clicked',
+          actionText,
+          webId,
+          userName,
+          window.location.pathname
+        );
         
-        console.log('✅ User interaction logged successfully:', {
-          element: target.tagName,
-          action: actionType,
-          resource: resourcePath,
-          timestamp: new Date().toISOString()
-        });
+        console.log('✅ User interaction logged successfully');
       } catch (error) {
         console.warn('⚠️ Failed to log user interaction:', error);
-        console.warn('Error details:', error);
       }
     };
 

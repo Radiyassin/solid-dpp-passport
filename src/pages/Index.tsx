@@ -33,14 +33,7 @@ const Index = () => {
           const isAdmin = webId === ORG_WEBID;
           setIsAdminUser(isAdmin);
           
-          // Setup audit ACL for org pod - always try to set up regardless of user type
-          try {
-            const session = getDefaultSession();
-            await auditService.ensureAuditAcl(session);
-            console.log('✅ Audit ACL configured for user:', webId);
-          } catch (auditError) {
-            console.warn('⚠️ Audit ACL setup failed for user:', webId, auditError);
-          }
+          // JSON-based audit system is now active - no ACL setup needed
         }
       } catch (error) {
         console.error('Failed to initialize session:', error);
