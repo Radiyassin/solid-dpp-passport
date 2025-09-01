@@ -52,6 +52,10 @@ interface AuditEvent {
   target: string;
   timestamp: Date;
   filename: string;
+  humanReadableDescription: string;
+  userName: string;
+  resourceName: string;
+  resourceType: string;
 }
 
 const AuditLogsViewer = () => {
@@ -104,15 +108,27 @@ const AuditLogsViewer = () => {
           const timestamp = getDatetime(auditThing, DCTERMS.created);
           
           if (actionType && actor && object && target && timestamp) {
-            events.push({
+            const event = {
               id: fileUrl,
               action: getActionName(actionType),
               actor,
               object,
               target,
               timestamp,
-              filename: fileUrl.split('/').pop() || 'unknown'
-            });
+              filename: fileUrl.split('/').pop() || 'unknown',
+              humanReadableDescription: '',
+              userName: '',
+              resourceName: '',
+              resourceType: ''
+            };
+            
+            // Parse meaningful information
+            event.userName = extractUserName(actor);
+            event.resourceName = extractResourceName(object);
+            event.resourceType = extractResourceType(object);
+            event.humanReadableDescription = generateHumanReadableDescription(event);
+            
+            events.push(event);
           }
         } catch (error) {
           console.warn(`Failed to load audit file ${fileUrl}:`, error);
@@ -202,6 +218,73 @@ const AuditLogsViewer = () => {
       return url.pathname.split('/').slice(-2).join('/');
     } catch {
       return resourceIri.split('/').slice(-2).join('/');
+    }
+  };
+
+  const extractUserName = (webId: string): string => {
+    try {
+      const url = new URL(webId);
+      const pathParts = url.pathname.split('/');
+      // Try to get a meaningful username from the WebID
+      if (pathParts.includes('profile')) {
+        const userPart = pathParts[pathParts.indexOf('profile') - 1];
+        return userPart || url.hostname.split('.')[0];
+      }
+      return url.hostname.split('.')[0];
+    } catch {
+      return webId.split('/').filter(part => part && part !== 'profile').pop() || 'Unknown User';
+    }
+  };
+
+  const extractResourceName = (objectIri: string): string => {
+    try {
+      const url = new URL(objectIri);
+      const fileName = url.pathname.split('/').pop();
+      if (fileName && fileName.includes('.')) {
+        return fileName.split('.')[0];
+      }
+      return fileName || url.pathname.split('/').filter(part => part).pop() || 'Unknown Resource';
+    } catch {
+      return objectIri.split('/').pop()?.split('.')[0] || 'Unknown Resource';
+    }
+  };
+
+  const extractResourceType = (objectIri: string): string => {
+    if (objectIri.includes('/dataspaces/')) return 'DataSpace';
+    if (objectIri.includes('/assets/')) return 'Asset';
+    if (objectIri.includes('/data/')) return 'Data';
+    if (objectIri.includes('/interactions/')) return 'User Interaction';
+    if (objectIri.includes('.ttl')) return 'Metadata';
+    return 'Resource';
+  };
+
+  const generateHumanReadableDescription = (event: any): string => {
+    const { action, userName, resourceName, resourceType } = event;
+    
+    switch (action) {
+      case 'Create':
+        if (resourceType === 'DataSpace') {
+          return `${userName} created a new dataspace "${resourceName}"`;
+        } else if (resourceType === 'Asset') {
+          return `${userName} created a new asset "${resourceName}"`;
+        } else if (resourceType === 'Data') {
+          return `${userName} uploaded data "${resourceName}"`;
+        } else if (resourceType === 'User Interaction') {
+          return `${userName} performed an interaction in the system`;
+        }
+        return `${userName} created ${resourceType.toLowerCase()} "${resourceName}"`;
+        
+      case 'Update':
+        return `${userName} updated ${resourceType.toLowerCase()} "${resourceName}"`;
+        
+      case 'Delete':
+        return `${userName} deleted ${resourceType.toLowerCase()} "${resourceName}"`;
+        
+      case 'PermissionChange':
+        return `${userName} changed permissions for ${resourceType.toLowerCase()} "${resourceName}"`;
+        
+      default:
+        return `${userName} performed ${action.toLowerCase()} on ${resourceType.toLowerCase()} "${resourceName}"`;
     }
   };
 
@@ -304,20 +387,19 @@ const AuditLogsViewer = () => {
                       </div>
                       
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="w-3 h-3 text-muted-foreground" />
-                          <span className="font-medium">
-                            {formatUserWebId(event.actor)}
-                          </span>
-                          <span className="text-muted-foreground">performed</span>
-                          <span className="font-medium text-primary">{event.action}</span>
+                        {/* Human-readable description */}
+                        <div className="text-sm font-medium text-foreground">
+                          {event.humanReadableDescription}
                         </div>
                         
-                        <div className="text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <Database className="w-3 h-3" />
-                            <span>Resource: {formatResourcePath(event.object)}</span>
-                          </div>
+                        {/* Resource type badge */}
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {event.resourceType}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatResourcePath(event.object)}
+                          </span>
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
