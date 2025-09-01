@@ -33,15 +33,13 @@ const Index = () => {
           const isAdmin = webId === ORG_WEBID;
           setIsAdminUser(isAdmin);
           
-          // Setup ACL if user is admin
-          if (isAdmin) {
-            try {
-              const session = getDefaultSession();
-              await auditService.ensureAuditAcl(session);
-              console.log('✅ Audit ACL configured');
-            } catch (auditError) {
-              console.warn('⚠️ Audit ACL setup failed:', auditError);
-            }
+          // Setup audit ACL for org pod - always try to set up regardless of user type
+          try {
+            const session = getDefaultSession();
+            await auditService.ensureAuditAcl(session);
+            console.log('✅ Audit ACL configured for user:', webId);
+          } catch (auditError) {
+            console.warn('⚠️ Audit ACL setup failed for user:', webId, auditError);
           }
         }
       } catch (error) {

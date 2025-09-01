@@ -141,6 +141,13 @@ export class AuditService {
   acl:accessTo <./> ;
   acl:default  <./> ;
   acl:mode acl:Append .
+
+<#readers>
+  a acl:Authorization ;
+  acl:agentClass foaf:Agent ;   # any logged-in WebID
+  acl:accessTo <./> ;
+  acl:default  <./> ;
+  acl:mode acl:Read .
 `.trim();
 
       await overwriteFile(

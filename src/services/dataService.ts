@@ -18,7 +18,9 @@ import {
   deleteFile,
 } from "@inrupt/solid-client";
 import { SolidAuthService } from "./solidAuth";
+import { AuditService } from "./auditService";
 import { DCTERMS, RDF, FOAF } from "@inrupt/vocab-common-rdf";
+import { getDefaultSession } from '@inrupt/solid-client-authn-browser';
 
 // Custom vocabulary for Data entries
 const DATA = {
@@ -176,6 +178,23 @@ export class DataService {
       };
 
       console.log('✅ Data upload completed successfully:', result);
+      
+      // Log the data upload action
+      try {
+        const session = getDefaultSession();
+        const userPodBase = webId.split('/profile/card#me')[0] + '/';
+        await AuditService.getInstance().logDataSpaceOperation(
+          session,
+          'Create',
+          dataId,
+          webId,
+          userPodBase
+        );
+        console.log('✅ Data upload logged to audit');
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log data upload:', auditError);
+      }
+      
       return result;
     } catch (error) {
       console.error('❌ Error uploading data:', error);
