@@ -18,15 +18,16 @@ import { Session } from "@inrupt/solid-client-authn-browser";
 import { RDF, DCTERMS } from "@inrupt/vocab-common-rdf";
 
 // ActivityStreams vocabulary
+const AS_NAMESPACE = "https://www.w3.org/ns/activitystreams#";
 const AS = {
-  Activity: "https://www.w3.org/ns/activitystreams#Activity",
-  Create: "https://www.w3.org/ns/activitystreams#Create",
-  Update: "https://www.w3.org/ns/activitystreams#Update",
-  Delete: "https://www.w3.org/ns/activitystreams#Delete",
-  PermissionChange: "https://www.w3.org/ns/activitystreams#Announce", // Using Announce for permission changes
-  actor: "https://www.w3.org/ns/activitystreams#actor",
-  object: "https://www.w3.org/ns/activitystreams#object",
-  target: "https://www.w3.org/ns/activitystreams#target",
+  Activity: `${AS_NAMESPACE}Activity`,
+  Create: `${AS_NAMESPACE}Create`,
+  Update: `${AS_NAMESPACE}Update`,
+  Delete: `${AS_NAMESPACE}Delete`,
+  PermissionChange: `${AS_NAMESPACE}Announce`, // Using Announce for permission changes
+  actor: `${AS_NAMESPACE}actor`,
+  object: `${AS_NAMESPACE}object`,
+  target: `${AS_NAMESPACE}target`,
 };
 
 // Organization Pod configuration
@@ -59,15 +60,8 @@ export class AuditService {
    * Appends an audit event to the organization's LDES
    */
   async appendAuditEvent(session: Session, event: AuditEventInput): Promise<void> {
-    if (!session.fetch) {
-      throw new Error('Session fetch not available');
-    }
-
     try {
       console.log('📝 Creating audit event:', event);
-
-      // Ensure the audit LDES container exists
-      await this.ensureAuditContainer(session);
 
       // Create the audit entry
       const timestamp = new Date();
@@ -76,22 +70,43 @@ export class AuditService {
 
       console.log('📝 Attempting to save audit event to:', auditFileUrl);
 
-      // Create the ActivityStreams audit entry
-      let dataset = createSolidDataset();
-      let auditThing = createThing({ url: auditFileUrl });
+      // Create the ActivityStreams audit entry as TTL content
+      const auditContent = `
+@prefix as: <${AS_NAMESPACE}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-      // Add ActivityStreams properties
-      const actionType = this.getActivityStreamType(event.action);
-      auditThing = addStringNoLocale(auditThing, RDF.type, actionType);
-      auditThing = addStringNoLocale(auditThing, AS.actor, event.actorWebId);
-      auditThing = addStringNoLocale(auditThing, AS.object, event.objectIri);
-      auditThing = addStringNoLocale(auditThing, AS.target, event.targetIri);
-      auditThing = addDatetime(auditThing, DCTERMS.created, timestamp);
+<${auditFileUrl}#event> a as:Activity, ${this.getActivityStreamType(event.action)} ;
+    as:actor <${event.actorWebId}> ;
+    as:object <${event.objectIri}> ;
+    as:target <${event.targetIri}> ;
+    dcterms:created "${timestamp.toISOString()}"^^xsd:dateTime ;
+    as:published "${timestamp.toISOString()}"^^xsd:dateTime .
+      `.trim();
 
-      dataset = setThing(dataset, auditThing);
+      console.log('📝 Audit content to save:', auditContent);
 
-      // Save the audit entry to the org Pod
-      await saveSolidDatasetAt(auditFileUrl, dataset, { fetch: session.fetch });
+      // Ensure the audit container exists (but don't modify ACL as regular user)
+      await this.ensureAuditContainer(session);
+
+      // Try to save using the user's session with append permissions
+      const response = await session.fetch(auditFileUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'text/turtle',
+        },
+        body: auditContent
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to save audit event:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to save audit event: ${response.status} ${response.statusText}`);
+      }
       
       console.log('✅ Audit event saved successfully to:', auditFileUrl);
     } catch (error) {
