@@ -30,11 +30,7 @@ const Index = () => {
         // Check if user is admin (org WebID or authorized users)
         if (isLoggedIn) {
           const webId = auth.getWebId();
-          const adminWebIds = [
-            ORG_WEBID,
-            'https://yassine-radi.solidcommunity.net/profile/card#me'
-          ];
-          const isAdmin = adminWebIds.includes(webId || '');
+          const isAdmin = webId === ORG_WEBID;
           setIsAdminUser(isAdmin);
           
           // Setup ACL if user is admin
