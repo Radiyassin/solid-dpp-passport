@@ -143,7 +143,8 @@ const DataSpaceManager = () => {
           
           <Button 
             onClick={() => setShowCreateDialog(true)}
-            className="bg-gradient-primary hover:shadow-elevated transition-all duration-300"
+            variant="premium"
+            size="lg"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Data Space
@@ -206,6 +207,7 @@ const DataSpaceManager = () => {
                 variant="outline"
                 size="sm"
                 disabled={isLoading}
+                className="min-w-[100px]"
               >
                 <Database className="w-4 h-4 mr-2" />
                 {isLoading ? 'Syncing...' : 'Refresh'}
@@ -222,7 +224,7 @@ const DataSpaceManager = () => {
                   </p>
                   <Button 
                     onClick={() => setShowCreateDialog(true)}
-                    className="bg-gradient-primary hover:shadow-elevated transition-all duration-300"
+                    variant="premium"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Your First Data Space
@@ -273,18 +275,19 @@ const DataSpaceManager = () => {
                       <div className="flex gap-2">
                         <Button
                           onClick={() => handleViewDataSpace(dataSpace)}
-                          variant="secondary"
+                          variant="default"
                           size="sm"
                           className="flex-1"
                         >
                           <Eye className="w-4 h-4 mr-2" />
-                          View
+                          View Details
                         </Button>
                         {getUserRole(dataSpace) === 'admin' && (
                           <Button
                             onClick={() => handleDeleteDataSpace(dataSpace)}
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
+                            className="px-3"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

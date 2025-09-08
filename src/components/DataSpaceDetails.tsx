@@ -217,9 +217,9 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
       <div className="flex items-center justify-between">
         <Button
           onClick={onBack}
-          variant="outline"
+          variant="ghost"
           size="sm"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-muted/50"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to List
@@ -228,20 +228,20 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
         {isAdmin && activeTab === 'overview' && (
           <div className="flex gap-2">
             {isEditing ? (
-              <>
-                <Button onClick={handleSaveEdit} size="sm">
+              <div className="flex gap-2">
+                <Button onClick={handleSaveEdit} variant="success" size="sm">
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  Save Changes
                 </Button>
                 <Button onClick={handleCancelEdit} variant="outline" size="sm">
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
-              </>
+              </div>
             ) : (
-              <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
+              <Button onClick={() => setIsEditing(true)} variant="secondary" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
-                Edit
+                Edit Details
               </Button>
             )}
           </div>
@@ -399,7 +399,7 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
             {isAdmin && (
               <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
                 <DialogTrigger asChild>
-                  <Button size="sm">
+                  <Button variant="premium" size="sm">
                     <UserPlus className="w-4 h-4 mr-2" />
                     Add Member
                   </Button>
@@ -435,11 +435,11 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
                       </Select>
                     </div>
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="gap-2">
                     <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleAddMember}>
+                    <Button onClick={handleAddMember} variant="success">
                       Add Member
                     </Button>
                   </DialogFooter>

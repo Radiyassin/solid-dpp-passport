@@ -145,7 +145,7 @@ const AssetList = ({ dataSpaceId, onAssetSelect }: AssetListProps) => {
         </div>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button>
+            <Button variant="premium" size="lg">
               <Plus className="w-4 h-4 mr-2" />
               Create Asset
             </Button>
@@ -214,7 +214,7 @@ const AssetList = ({ dataSpaceId, onAssetSelect }: AssetListProps) => {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => {
                 setNewAsset({
                   title: '',
@@ -226,7 +226,8 @@ const AssetList = ({ dataSpaceId, onAssetSelect }: AssetListProps) => {
               }}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateAsset}>
+              <Button onClick={handleCreateAsset} variant="success">
+                <Plus className="w-4 h-4 mr-2" />
                 Create Asset
               </Button>
             </DialogFooter>
@@ -297,9 +298,9 @@ const AssetList = ({ dataSpaceId, onAssetSelect }: AssetListProps) => {
 
                   {/* Action */}
                   <div className="pt-2">
-                    <Button variant="outline" size="sm" className="w-full">
+                    <Button variant="default" size="sm" className="w-full">
                       <Eye className="w-4 h-4 mr-2" />
-                      View Asset
+                      View Details
                     </Button>
                   </div>
                 </div>
@@ -314,9 +315,9 @@ const AssetList = ({ dataSpaceId, onAssetSelect }: AssetListProps) => {
           <p className="text-muted-foreground mb-4">
             Create your first asset to start organizing your data and metadata
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button onClick={() => setShowCreateDialog(true)} variant="premium">
             <Plus className="w-4 h-4 mr-2" />
-            Create Asset
+            Create First Asset
           </Button>
         </div>
       )}
