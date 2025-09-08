@@ -19,9 +19,9 @@ export const AuditActionLogger: React.FC<AuditActionLoggerProps> = ({ children }
     const handleGlobalInteraction = (event: Event) => {
       const target = event.target as HTMLElement;
       
-      // Only log meaningful interactions (buttons, links, form submissions)
+      // Only log meaningful interactions (links, form submissions, special tracked elements)
+      // Removed button clicks as per user request
       if (
-        target.tagName === 'BUTTON' ||
         target.tagName === 'A' ||
         (target as HTMLInputElement).type === 'submit' ||
         target.classList.contains('audit-track')
