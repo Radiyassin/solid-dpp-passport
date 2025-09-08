@@ -144,6 +144,18 @@ export interface CreateDataSpaceInput {
 
 export interface AddMetadataInput extends Omit<DataSpaceMetadata, 'id' | 'createdAt' | 'createdBy'> {}
 
+export interface DataSpaceInvitation {
+  id: string;
+  dataSpaceId: string;
+  dataSpaceTitle: string;
+  dataSpaceDescription: string;
+  invitedBy: string;
+  invitedAt: Date;
+  adminName: string;
+  membersCount: number;
+  previewItems: string[];
+}
+
 export class DataSpaceService {
   private static instance: DataSpaceService;
   private auth: SolidAuthService;
@@ -174,6 +186,14 @@ export class DataSpaceService {
     
     const baseUrl = webId.split('/profile')[0];
     return `${baseUrl}/dataspace-access-index.ttl`;
+  }
+
+  private getUserInvitationsUrl(): string {
+    const webId = this.auth.getWebId();
+    if (!webId) throw new Error('User not authenticated');
+    
+    const baseUrl = webId.split('/profile')[0];
+    return `${baseUrl}/dataspace-invitations.ttl`;
   }
 
   private getDataSpaceUrl(id: string): string {
@@ -1063,5 +1083,72 @@ export class DataSpaceService {
     } catch (error) {
       console.warn('Failed to log access grant:', error);
     }
+  }
+
+  async storeInvitation(userWebId: string, dataSpace: DataSpace): Promise<void> {
+    const currentWebId = this.auth.getWebId();
+    if (!currentWebId) throw new Error('User not authenticated');
+
+    // Store invitation in the invited user's pod (or a central location)
+    const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const adminName = currentWebId.split('/profile')[0].split('/').pop() || 'Admin';
+    
+    // For simplicity, store in localStorage for demo purposes
+    // In production, this should be stored in the user's pod
+    const existingInvitations = JSON.parse(localStorage.getItem('dataspace-invitations') || '[]');
+    
+    const invitation = {
+      id: invitationId,
+      dataSpaceId: dataSpace.id,
+      dataSpaceTitle: dataSpace.title,
+      dataSpaceDescription: dataSpace.description,
+      invitedBy: currentWebId,
+      invitedAt: new Date().toISOString(),
+      adminName,
+      membersCount: dataSpace.members.length,
+      previewItems: dataSpace.metadata.slice(0, 5).map(m => m.title),
+      targetUser: userWebId
+    };
+
+    existingInvitations.push(invitation);
+    localStorage.setItem('dataspace-invitations', JSON.stringify(existingInvitations));
+  }
+
+  async getPendingInvitations(): Promise<DataSpaceInvitation[]> {
+    const currentWebId = this.auth.getWebId();
+    if (!currentWebId) return [];
+
+    // Get invitations from localStorage
+    const allInvitations = JSON.parse(localStorage.getItem('dataspace-invitations') || '[]');
+    
+    // Filter for current user and convert dates
+    return allInvitations
+      .filter((inv: any) => inv.targetUser === currentWebId)
+      .map((inv: any) => ({
+        ...inv,
+        invitedAt: new Date(inv.invitedAt)
+      }));
+  }
+
+  async acceptInvitation(invitationId: string): Promise<void> {
+    const allInvitations = JSON.parse(localStorage.getItem('dataspace-invitations') || '[]');
+    const invitation = allInvitations.find((inv: any) => inv.id === invitationId);
+    
+    if (!invitation) {
+      throw new Error('Invitation not found');
+    }
+
+    // Add user to dataspace
+    await this.grantUserAccess(invitation.dataSpaceId, invitation.targetUser);
+    
+    // Remove invitation
+    const updatedInvitations = allInvitations.filter((inv: any) => inv.id !== invitationId);
+    localStorage.setItem('dataspace-invitations', JSON.stringify(updatedInvitations));
+  }
+
+  async declineInvitation(invitationId: string): Promise<void> {
+    const allInvitations = JSON.parse(localStorage.getItem('dataspace-invitations') || '[]');
+    const updatedInvitations = allInvitations.filter((inv: any) => inv.id !== invitationId);
+    localStorage.setItem('dataspace-invitations', JSON.stringify(updatedInvitations));
   }
 }

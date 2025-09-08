@@ -130,6 +130,9 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
     try {
       console.log('🔄 Adding member:', newMemberWebId.trim(), 'with role:', newMemberRole);
       
+      // Store invitation first
+      await dataSpaceService.storeInvitation(newMemberWebId.trim(), dataSpace);
+      
       // Use enhanced access granting that includes Solid ACL permissions
       await dataSpaceService.grantUserAccessEnhanced(dataSpace.id, newMemberWebId.trim(), newMemberRole);
       
@@ -140,7 +143,7 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
       
       toast({
         title: 'Success',
-        description: `Access granted to ${newMemberWebId.trim()} with ${newMemberRole} role`,
+        description: `Invitation sent to ${newMemberWebId.trim()}. They will receive a notification when they log in.`,
       });
     } catch (error) {
       console.error('Error adding member:', error);
