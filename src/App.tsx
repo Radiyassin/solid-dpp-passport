@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import AdminPanel from "./pages/AdminPanel";
 import DataSpaces from "./pages/DataSpaces";
 import NotFound from "./pages/NotFound";
+import UserRoleIndicator from "./components/UserRoleIndicator";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <UserRoleIndicator />
         </BrowserRouter>
       </AuditActionLogger>
     </TooltipProvider>

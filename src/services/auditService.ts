@@ -221,14 +221,27 @@ export class AuditService {
    */
   isAdmin(webId: string | undefined): boolean {
     if (!webId) return false;
-    // Define admin WebIDs - you can modify this logic
+    
+    // Define admin WebIDs and email patterns
     const adminWebIds = [
       'https://admin.solidcommunity.net/profile/card#me',
       'https://admin.solidweb.org/profile/card#me'
     ];
     
-    // Also check if the user's Pod URL contains "admin"
-    return adminWebIds.includes(webId) || webId.toLowerCase().includes('admin');
+    // Admin email patterns
+    const adminEmails = [
+      'yassine.radi@alumni.fh-aachen.de'
+    ];
+    
+    // Check direct WebID match
+    if (adminWebIds.includes(webId)) return true;
+    
+    // Check if WebID contains admin keywords
+    if (webId.toLowerCase().includes('admin')) return true;
+    
+    // Check if WebID contains any admin email
+    const webIdLower = webId.toLowerCase();
+    return adminEmails.some(email => webIdLower.includes(email.toLowerCase()));
   }
 }
 

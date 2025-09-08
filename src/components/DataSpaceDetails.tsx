@@ -23,6 +23,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { DataSpace, DataSpaceService, DataSpaceRole } from '@/services/dataSpaceService';
 import { SolidAuthService } from '@/services/solidAuth';
+import { AuditService } from '@/services/auditService';
 import { 
   ArrowLeft, 
   Users, 
@@ -79,9 +80,13 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
   
   const dataSpaceService = DataSpaceService.getInstance();
   const auth = SolidAuthService.getInstance();
+  const auditService = AuditService.getInstance();
   const currentWebId = auth.getWebId();
 
-  const isAdmin = dataSpace.members.find(m => m.webId === currentWebId)?.role === 'admin';
+  // Check if user is system admin or dataspace admin
+  const isSystemAdmin = auditService.isAdmin(currentWebId);
+  const isDataSpaceAdmin = dataSpace.members.find(m => m.webId === currentWebId)?.role === 'admin';
+  const isAdmin = isSystemAdmin || isDataSpaceAdmin;
 
   const handleSaveEdit = async () => {
     try {
