@@ -18,10 +18,13 @@ import {
   Loader2,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Bell
 } from 'lucide-react';
 import CreateDataSpaceDialog from './CreateDataSpaceDialog';
 import DataSpaceDetails from './DataSpaceDetails';
+import DataSpaceInvitations from './DataSpaceInvitations';
+import NotificationBanner from './NotificationBanner';
 
 const DataSpaceManager = () => {
   const [dataSpaces, setDataSpaces] = useState<DataSpace[]>([]);
@@ -137,6 +140,9 @@ const DataSpaceManager = () => {
 
   return (
     <div className="space-y-6">
+      {!isAdmin && (
+        <NotificationBanner onViewInvitations={() => setActiveTab('invitations')} />
+      )}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">
           <TabsList>
@@ -144,6 +150,12 @@ const DataSpaceManager = () => {
               <Database className="w-4 h-4" />
               Data Spaces
             </TabsTrigger>
+            {!isAdmin && (
+              <TabsTrigger value="invitations" className="flex items-center gap-2">
+                <Bell className="w-4 h-4" />
+                Invitations
+              </TabsTrigger>
+            )}
             {selectedDataSpace && (
               <TabsTrigger value="details" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
@@ -338,6 +350,10 @@ const DataSpaceManager = () => {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="invitations">
+          <DataSpaceInvitations />
         </TabsContent>
 
         <TabsContent value="details">
