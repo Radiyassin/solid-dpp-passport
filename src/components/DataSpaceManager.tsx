@@ -234,27 +234,42 @@ const DataSpaceManager = () => {
             </div>
 
             {dataSpaces.length === 0 ? (
-              <Card className="bg-gradient-card shadow-card">
-                <CardContent className="text-center py-12">
-                  <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Data Spaces Yet</h3>
-                   <p className="text-muted-foreground mb-4">
-                     {isAdmin ? 
-                       'Create your first Data Space to start collaborating with others' :
-                       'No Data Spaces available yet. Contact an administrator to get access to Data Spaces.'
+              <div className="space-y-4">
+                {/* Debug Info Card */}
+                <Card className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                  <CardHeader>
+                    <CardTitle className="text-sm text-amber-800 dark:text-amber-200">Debug Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2 text-amber-700 dark:text-amber-300">
+                    <p><strong>Current User:</strong> {currentWebId || 'Not logged in'}</p>
+                    <p><strong>Is Admin:</strong> {isAdmin ? 'Yes' : 'No'}</p>
+                    <p><strong>Admin Pod URL:</strong> https://solid4dpp.solidcommunity.net/dataspaces/</p>
+                    <p><strong>Expected Behavior:</strong> {isAdmin ? 'Admin can create dataspaces' : 'User should see dataspaces they have access to'}</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-gradient-card shadow-card">
+                  <CardContent className="text-center py-12">
+                    <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Data Spaces Found</h3>
+                     <p className="text-muted-foreground mb-4">
+                       {isAdmin ? 
+                         'Create your first Data Space to start collaborating with others' :
+                         'No Data Spaces available yet. Ask the admin (solid4dpp.solidcommunity.net) to grant you access to existing Data Spaces.'
                      }
-                   </p>
-                   {isAdmin && (
-                     <Button 
-                       onClick={() => setShowCreateDialog(true)}
-                       variant="premium"
-                     >
-                       <Plus className="w-4 h-4 mr-2" />
-                       Create Your First Data Space
-                     </Button>
-                   )}
-                </CardContent>
-              </Card>
+                     </p>
+                     {isAdmin && (
+                       <Button 
+                         onClick={() => setShowCreateDialog(true)}
+                         variant="premium"
+                       >
+                         <Plus className="w-4 h-4 mr-2" />
+                         Create Your First Data Space
+                       </Button>
+                     )}
+                  </CardContent>
+                </Card>
+              </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {dataSpaces.map((dataSpace) => (
