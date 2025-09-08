@@ -128,14 +128,19 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
     }
 
     try {
-      await dataSpaceService.addMember(dataSpace.id, newMemberWebId.trim(), newMemberRole);
+      console.log('🔄 Adding member:', newMemberWebId.trim(), 'with role:', newMemberRole);
+      
+      // Use grantUserAccess instead of addMember to properly handle cross-pod access
+      await dataSpaceService.grantUserAccess(dataSpace.id, newMemberWebId.trim(), newMemberRole);
+      
       setNewMemberWebId('');
       setNewMemberRole('read');
       setShowAddMemberDialog(false);
       onUpdate();
+      
       toast({
         title: 'Success',
-        description: 'Member added successfully',
+        description: `Access granted to ${newMemberWebId.trim()} with ${newMemberRole} role`,
       });
     } catch (error) {
       console.error('Error adding member:', error);

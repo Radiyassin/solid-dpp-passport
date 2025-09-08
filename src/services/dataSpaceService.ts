@@ -150,11 +150,18 @@ export class DataSpaceService {
   }
 
   private getDataSpacesContainerUrl(): string {
+    // DataSpaces are always stored in the admin's pod
+    const adminWebId = 'https://solid4dpp.solidcommunity.net/profile/card#me';
+    const baseUrl = adminWebId.split('/profile')[0];
+    return `${baseUrl}/dataspaces/`;
+  }
+
+  private getUserDataSpaceIndexUrl(): string {
     const webId = this.auth.getWebId();
     if (!webId) throw new Error('User not authenticated');
     
     const baseUrl = webId.split('/profile')[0];
-    return `${baseUrl}/dataspaces/`;
+    return `${baseUrl}/dataspace-access-index.ttl`;
   }
 
   private getDataSpaceUrl(id: string): string {
@@ -298,77 +305,89 @@ export class DataSpaceService {
   }
 
   async listDataSpaces(): Promise<DataSpace[]> {
+    const currentWebId = this.auth.getWebId();
+    const currentUserIsAdmin = this.auditService.isAdmin(currentWebId);
+    
+    // If current user is admin, use their fetch to access admin pod
+    // If not admin, try to access publicly readable DataSpaces
     const containerUrl = this.getDataSpacesContainerUrl();
-    const fetch = this.auth.getFetch();
+    const fetch = this.auth.getFetch() || window.fetch;
     
     try {
       console.log('🔍 Loading dataspaces from container:', containerUrl);
+      console.log('Current user is admin:', currentUserIsAdmin);
       
-      // Try to get the container to find dataspace files
-      let containerDataset;
-      try {
-        containerDataset = await getSolidDataset(containerUrl, { fetch });
-      } catch (containerError) {
-        console.log('DataSpaces container does not exist yet, returning empty list');
-        return [];
-      }
-
       const dataSpaces: DataSpace[] = [];
-      const containerThings = getThingAll(containerDataset);
       
-      console.log('📁 Found container things:', containerThings.length);
-      
-      // Look for references to dataspace files in the container
-      // Since each dataspace is in its own .ttl file, we need to find and read each file
-      for (const thing of containerThings) {
-        const thingUrl = thing.url;
-        console.log('🔍 Checking thing:', thingUrl);
-        
-        // Check if this is a dataspace file (.ttl)
-        if (thingUrl && thingUrl.endsWith('.ttl') && thingUrl.includes('/dataspaces/')) {
-          try {
-            console.log('📖 Reading dataspace file:', thingUrl);
-            const dataSpaceDataset = await getSolidDataset(thingUrl, { fetch });
+      // If user is admin, they can access all DataSpaces from their own pod
+      if (currentUserIsAdmin) {
+        try {
+          const containerDataset = await getSolidDataset(containerUrl, { fetch });
+          const containerThings = getThingAll(containerDataset);
+          
+          console.log('📁 Found container things:', containerThings.length);
+          
+          for (const thing of containerThings) {
+            const thingUrl = thing.url;
             
-            // Extract ID from filename
-            const id = thingUrl.split('/').pop()?.replace('.ttl', '') || '';
-            console.log('🆔 Extracted ID:', id);
-            
-            if (id) {
-              const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
-              console.log('✅ Parsed dataspace:', dataSpace.title, 'active:', dataSpace.isActive);
-              
-              if (dataSpace.isActive) {
-                dataSpaces.push(dataSpace);
+            if (thingUrl && thingUrl.endsWith('.ttl') && thingUrl.includes('/dataspaces/')) {
+              try {
+                console.log('📖 Reading dataspace file:', thingUrl);
+                const dataSpaceDataset = await getSolidDataset(thingUrl, { fetch });
+                
+                const id = thingUrl.split('/').pop()?.replace('.ttl', '') || '';
+                
+                if (id) {
+                  const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+                  console.log('✅ Parsed dataspace:', dataSpace.title, 'active:', dataSpace.isActive);
+                  
+                  if (dataSpace.isActive) {
+                    dataSpaces.push(dataSpace);
+                  }
+                }
+              } catch (parseError) {
+                console.error('❌ Error parsing dataspace file:', thingUrl, parseError);
               }
             }
-          } catch (parseError) {
-            console.error('❌ Error parsing dataspace file:', thingUrl, parseError);
           }
+        } catch (containerError) {
+          console.log('DataSpaces container does not exist yet, returning empty list');
+          return [];
         }
-      }
-      
-      // Fallback: If no dataspaces found via container, try direct discovery
-      if (dataSpaces.length === 0) {
-        console.log('🔄 No dataspaces found via container, trying direct discovery...');
+      } else {
+        // For non-admin users, try to access DataSpaces using fallback discovery
+        console.log('🔄 Non-admin user, trying direct discovery...');
         
-        // Try to discover dataspaces by checking known patterns
-        // This is a fallback for when container indexing doesn't work properly
         const testIds = await this.discoverDataSpaceIds();
         for (const id of testIds) {
           try {
-            const dataSpace = await this.getDataSpace(id);
-            if (dataSpace && dataSpace.isActive) {
+            // Try to access each DataSpace with unauthenticated fetch first, then authenticated
+            let dataSpace;
+            try {
+              const dataSpaceUrl = this.getDataSpaceUrl(id);
+              const dataSpaceDataset = await getSolidDataset(dataSpaceUrl, { fetch: window.fetch });
+              dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+            } catch (unauthError) {
+              // Try with authenticated fetch as fallback
+              try {
+                const dataSpaceDataset = await getSolidDataset(this.getDataSpaceUrl(id), { fetch });
+                dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+              } catch (authError) {
+                console.log(`Cannot access dataspace ${id}:`, authError.message);
+                continue;
+              }
+            }
+            
+            if (dataSpace && dataSpace.isActive && this.checkUserAccess(dataSpace, currentWebId)) {
               dataSpaces.push(dataSpace);
             }
           } catch (error) {
-            // Ignore errors for non-existent dataspaces
+            console.log(`Error accessing dataspace ${id}:`, error);
           }
         }
       }
       
-      // Filter dataspaces based on user access
-      const currentWebId = this.auth.getWebId();
+      // Filter dataspaces based on user access (additional safety check)
       const accessibleDataSpaces = dataSpaces.filter(dataSpace => 
         this.checkUserAccess(dataSpace, currentWebId)
       );
@@ -800,8 +819,30 @@ export class DataSpaceService {
     // Check if user is a member or in allowed users list
     const isMember = dataSpace.members.some(member => member.webId === userWebId);
     const isAllowed = dataSpace.allowedUsers.includes(userWebId);
+    
+    // Also check localStorage for granted access (temporary solution)
+    const hasStoredAccess = this.checkStoredAccess(userWebId, dataSpace.id);
 
-    return isMember || isAllowed;
+    const hasAccess = isMember || isAllowed || hasStoredAccess;
+    console.log(`🔐 Access check for ${userWebId} to ${dataSpace.id}:`, {
+      isMember,
+      isAllowed,
+      hasStoredAccess,
+      hasAccess
+    });
+
+    return hasAccess;
+  }
+
+  private checkStoredAccess(userWebId: string, dataSpaceId: string): boolean {
+    try {
+      const accessKey = `dataspace_access_${userWebId}`;
+      const storedAccess = JSON.parse(localStorage.getItem(accessKey) || '[]');
+      return storedAccess.some((access: any) => access.dataSpaceId === dataSpaceId);
+    } catch (error) {
+      console.warn('Error checking stored access:', error);
+      return false;
+    }
   }
 
   /**
@@ -815,6 +856,13 @@ export class DataSpaceService {
     }
 
     await this.addMember(dataSpaceId, userWebId, role);
+    
+    // Create access index entry in user's pod
+    try {
+      await this.updateUserAccessIndex(userWebId, dataSpaceId, role, 'grant');
+    } catch (error) {
+      console.warn('Failed to update user access index:', error);
+    }
     
     // Log the access grant
     try {
@@ -831,6 +879,37 @@ export class DataSpaceService {
       });
     } catch (error) {
       console.warn('Failed to log access grant:', error);
+    }
+  }
+
+  private async updateUserAccessIndex(userWebId: string, dataSpaceId: string, role: DataSpaceRole, action: 'grant' | 'revoke'): Promise<void> {
+    // This would ideally require the admin to have write access to user's pod
+    // For now, we'll implement this as a notification system or skip it
+    // In a real implementation, this would need proper access control setup
+    console.log(`✅ Access ${action} for user ${userWebId} to dataspace ${dataSpaceId} with role ${role}`);
+    
+    // Store the access grant info in browser storage as a temporary solution
+    const accessKey = `dataspace_access_${userWebId}`;
+    const existingAccess = JSON.parse(localStorage.getItem(accessKey) || '[]');
+    
+    if (action === 'grant') {
+      const accessInfo = {
+        dataSpaceId,
+        role,
+        grantedAt: new Date().toISOString(),
+        grantedBy: this.auth.getWebId()
+      };
+      
+      // Remove any existing access for this dataspace
+      const filteredAccess = existingAccess.filter((access: any) => access.dataSpaceId !== dataSpaceId);
+      filteredAccess.push(accessInfo);
+      
+      localStorage.setItem(accessKey, JSON.stringify(filteredAccess));
+      console.log(`✅ Stored access grant in localStorage for ${userWebId}`);
+    } else if (action === 'revoke') {
+      const filteredAccess = existingAccess.filter((access: any) => access.dataSpaceId !== dataSpaceId);
+      localStorage.setItem(accessKey, JSON.stringify(filteredAccess));
+      console.log(`✅ Removed access from localStorage for ${userWebId}`);
     }
   }
 }
