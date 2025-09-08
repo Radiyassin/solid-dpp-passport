@@ -224,13 +224,12 @@ export class AuditService {
     
     // Define admin WebIDs and email patterns
     const adminWebIds = [
-      'https://admin.solidcommunity.net/profile/card#me',
-      'https://admin.solidweb.org/profile/card#me'
+      'https://solid4dpp.solidcommunity.net/profile/card#me'
     ];
     
     // Admin email patterns
     const adminEmails = [
-      'yassine.radi@alumni.fh-aachen.de'
+      'solid4dpp.solidcommunity.net'
     ];
     
     // Check direct WebID match
