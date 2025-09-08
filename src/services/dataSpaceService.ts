@@ -367,8 +367,14 @@ export class DataSpaceService {
         }
       }
       
-      console.log('📋 Final dataspaces list:', dataSpaces.length, 'found');
-      return dataSpaces;
+      // Filter dataspaces based on user access
+      const currentWebId = this.auth.getWebId();
+      const accessibleDataSpaces = dataSpaces.filter(dataSpace => 
+        this.checkUserAccess(dataSpace, currentWebId)
+      );
+      
+      console.log('📋 Final dataspaces list:', dataSpaces.length, 'found,', accessibleDataSpaces.length, 'accessible to user');
+      return accessibleDataSpaces;
     } catch (error) {
       console.error('❌ Error listing data spaces:', error);
       return [];
