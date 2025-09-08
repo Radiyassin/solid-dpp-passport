@@ -16,6 +16,18 @@ import {
   getThingAll,
   removeThing,
   getSourceUrl,
+  setAgentResourceAccess,
+  getAgentResourceAccess,
+  createContainerAt,
+  getResourceAcl,
+  createAclFromFallbackAcl,
+  setAgentDefaultAccess,
+  saveAclFor,
+  hasResourceAcl,
+  hasFallbackAcl,
+  hasAccessibleAcl,
+  createAcl,
+  getResourceInfoWithAcl
 } from "@inrupt/solid-client";
 import { getDefaultSession } from "@inrupt/solid-client-authn-browser";
 import { SolidAuthService } from "./solidAuth";
@@ -308,10 +320,12 @@ export class DataSpaceService {
     const currentWebId = this.auth.getWebId();
     const currentUserIsAdmin = this.auditService.isAdmin(currentWebId);
     
-    // If current user is admin, use their fetch to access admin pod
-    // If not admin, try to access publicly readable DataSpaces
+    // Always use the admin pod URL for dataspaces
     const containerUrl = this.getDataSpacesContainerUrl();
-    const fetch = this.auth.getFetch() || window.fetch;
+    
+    // For non-admin users, try to use their authenticated fetch first, then fall back to unauthenticated
+    const authenticatedFetch = this.auth.getFetch();
+    const fetch = currentUserIsAdmin ? authenticatedFetch : (authenticatedFetch || window.fetch);
     
     try {
       console.log('🔍 Loading dataspaces from container:', containerUrl);
@@ -355,34 +369,38 @@ export class DataSpaceService {
           return [];
         }
       } else {
-        // For non-admin users, try to access DataSpaces using fallback discovery
-        console.log('🔄 Non-admin user, trying direct discovery...');
+        // For non-admin users, try to access DataSpaces using authenticated fetch
+        console.log('🔄 Non-admin user, checking accessible dataspaces...');
         
         const testIds = await this.discoverDataSpaceIds();
+        
+        // Try both with and without authentication for maximum compatibility
+        const fetchMethods = [
+          { name: 'authenticated', fetch },
+          { name: 'unauthenticated', fetch: window.fetch }
+        ];
+        
         for (const id of testIds) {
-          try {
-            // Try to access each DataSpace with unauthenticated fetch first, then authenticated
-            let dataSpace;
+          let dataSpaceAdded = false;
+          
+          for (const { name, fetch: fetchMethod } of fetchMethods) {
+            if (dataSpaceAdded) break;
+            
             try {
               const dataSpaceUrl = this.getDataSpaceUrl(id);
-              const dataSpaceDataset = await getSolidDataset(dataSpaceUrl, { fetch: window.fetch });
-              dataSpace = this.parseDataSpace(id, dataSpaceDataset);
-            } catch (unauthError) {
-              // Try with authenticated fetch as fallback
-              try {
-                const dataSpaceDataset = await getSolidDataset(this.getDataSpaceUrl(id), { fetch });
-                dataSpace = this.parseDataSpace(id, dataSpaceDataset);
-              } catch (authError) {
-                console.log(`Cannot access dataspace ${id}:`, authError.message);
-                continue;
+              console.log(`🔍 Trying ${name} access to:`, dataSpaceUrl);
+              
+              const dataSpaceDataset = await getSolidDataset(dataSpaceUrl, { fetch: fetchMethod });
+              const dataSpace = this.parseDataSpace(id, dataSpaceDataset);
+              
+              if (dataSpace && dataSpace.isActive && this.checkUserAccess(dataSpace, currentWebId)) {
+                dataSpaces.push(dataSpace);
+                dataSpaceAdded = true;
+                console.log(`✅ Successfully accessed dataspace ${id} via ${name} fetch`);
               }
+            } catch (error) {
+              console.log(`Cannot access dataspace ${id} via ${name} fetch:`, error.message);
             }
-            
-            if (dataSpace && dataSpace.isActive && this.checkUserAccess(dataSpace, currentWebId)) {
-              dataSpaces.push(dataSpace);
-            }
-          } catch (error) {
-            console.log(`Error accessing dataspace ${id}:`, error);
           }
         }
       }
@@ -910,6 +928,140 @@ export class DataSpaceService {
       const filteredAccess = existingAccess.filter((access: any) => access.dataSpaceId !== dataSpaceId);
       localStorage.setItem(accessKey, JSON.stringify(filteredAccess));
       console.log(`✅ Removed access from localStorage for ${userWebId}`);
+    }
+  }
+
+  /**
+   * Helper function to grant proper Solid access to a dataspace container
+   * This function grants Read/Write access to the invited member
+   */
+  async grantAccessToDataspace(adminSession: any, containerUrl: string, memberWebId: string): Promise<void> {
+    try {
+      console.log('🔐 Granting access to dataspace container:', containerUrl, 'for user:', memberWebId);
+      
+      const fetch = adminSession?.fetch || this.auth.getFetch();
+      
+      if (!fetch) {
+        throw new Error('No authenticated fetch function available');
+      }
+
+      // First, ensure the container exists by trying to access it
+      try {
+        await getSolidDataset(containerUrl, { fetch });
+        console.log('✅ Container exists:', containerUrl);
+      } catch (error) {
+        console.log('📁 Creating container:', containerUrl);
+        try {
+          await createContainerAt(containerUrl, { fetch });
+        } catch (createError) {
+          console.warn('Could not create container, continuing with member-based access control');
+          return;
+        }
+      }
+
+      // Try to set ACL permissions if possible
+      try {
+        const resourceInfoWithAcl = await getResourceInfoWithAcl(containerUrl, { fetch });
+        
+        if (hasAccessibleAcl(resourceInfoWithAcl)) {
+          let resourceAcl;
+          
+          if (hasResourceAcl(resourceInfoWithAcl)) {
+            resourceAcl = await getResourceAcl(resourceInfoWithAcl);
+          } else if (hasFallbackAcl(resourceInfoWithAcl)) {
+            resourceAcl = createAclFromFallbackAcl(resourceInfoWithAcl);
+          } else {
+            resourceAcl = createAcl(resourceInfoWithAcl);
+          }
+          
+          if (resourceAcl) {
+            // Grant read/write access to the container itself
+            resourceAcl = setAgentResourceAccess(resourceAcl, memberWebId, { 
+              read: true, 
+              write: true, 
+              append: true, 
+              control: false 
+            });
+            
+            // Grant default read/write access for items inside the container
+            resourceAcl = setAgentDefaultAccess(resourceAcl, memberWebId, { 
+              read: true, 
+              write: true, 
+              append: true, 
+              control: false 
+            });
+
+            // Save the ACL
+            await saveAclFor(resourceInfoWithAcl, resourceAcl, { fetch });
+            console.log('✅ Successfully granted ACL access to', memberWebId, 'for container:', containerUrl);
+          }
+        } else {
+          console.log('📝 ACL not accessible, using member-based access control');
+        }
+      } catch (aclError) {
+        console.log('🔧 ACL operation failed, using member-based access control:', aclError);
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to grant access to dataspace:', error);
+      // Don't throw error - app can still function with member-list based access control
+      console.log('📝 Falling back to member-list based access control');
+    }
+  }
+
+  /**
+   * Enhanced grantUserAccess that includes proper Solid ACL permissions
+   */
+  async grantUserAccessEnhanced(dataSpaceId: string, userWebId: string, role: DataSpaceRole = 'read'): Promise<void> {
+    const currentWebId = this.auth.getWebId();
+    
+    if (!this.auditService.isAdmin(currentWebId)) {
+      throw new Error('Only administrators can grant user access');
+    }
+
+    console.log('🔄 Enhanced access grant for:', userWebId, 'to dataspace:', dataSpaceId);
+
+    // First, add member to the dataspace metadata
+    await this.addMember(dataSpaceId, userWebId, role);
+    
+    // Get the dataspace to find its storage location
+    const dataSpace = await this.getDataSpace(dataSpaceId);
+    if (!dataSpace) {
+      throw new Error('DataSpace not found');
+    }
+
+    // Grant Solid ACL access to the storage container
+    const containerUrl = dataSpace.storageLocation;
+    const session = { fetch: this.auth.getFetch() };
+    
+    try {
+      await this.grantAccessToDataspace(session, containerUrl, userWebId);
+    } catch (error) {
+      console.warn('⚠️ Failed to set Solid ACL permissions (dataspace may still be accessible):', error);
+    }
+    
+    // Create access index entry in user's pod
+    try {
+      await this.updateUserAccessIndex(userWebId, dataSpaceId, role, 'grant');
+    } catch (error) {
+      console.warn('Failed to update user access index:', error);
+    }
+    
+    // Log the access grant
+    try {
+      const userName = userWebId.split('/profile')[0].split('/').pop() || 'Unknown User';
+      const adminName = currentWebId?.split('/profile')[0].split('/').pop() || 'Admin';
+      await this.auditService.logEvent({
+        userId: currentWebId!,
+        userName: adminName,
+        action: 'Create',
+        resourceType: 'DataSpace Access',
+        resourceName: dataSpaceId,
+        description: `${adminName} granted ${role} access to ${userName} for dataspace "${dataSpaceId}"`,
+        metadata: { grantedTo: userWebId, role }
+      });
+    } catch (error) {
+      console.warn('Failed to log access grant:', error);
     }
   }
 }

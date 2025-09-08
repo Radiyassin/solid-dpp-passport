@@ -13,6 +13,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@inrupt/solid-client": "^2.1.2",
+    "@inrupt/solid-client-access-grants": "^3.3.1",
     "@inrupt/solid-client-authn-browser": "^3.1.0",
     "@inrupt/vocab-common-rdf": "^1.0.5",
     "@radix-ui/react-accordion": "^1.2.0",
