@@ -130,8 +130,8 @@ const DataSpaceDetails = ({ dataSpace, onUpdate, onBack }: DataSpaceDetailsProps
     try {
       console.log('🔄 Adding member:', newMemberWebId.trim(), 'with role:', newMemberRole);
       
-      // Use enhanced access granting that includes Solid ACL permissions
-      await dataSpaceService.grantUserAccessEnhanced(dataSpace.id, newMemberWebId.trim(), newMemberRole);
+      // Use grantUserAccess instead of addMember to properly handle cross-pod access
+      await dataSpaceService.grantUserAccess(dataSpace.id, newMemberWebId.trim(), newMemberRole);
       
       setNewMemberWebId('');
       setNewMemberRole('read');
