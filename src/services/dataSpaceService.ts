@@ -111,6 +111,7 @@ export interface DataSpace {
   metadata: DataSpaceMetadata[];
   tags: string[];
   category?: string;
+  allowedUsers: string[]; // WebIDs of users who can access this dataspace
 }
 
 export interface DataSpaceMember {
@@ -170,6 +171,12 @@ export class DataSpaceService {
     if (!webId) {
       console.error('User not authenticated - no WebID found');
       throw new Error('User not authenticated');
+    }
+
+    // Check if user is admin
+    if (!this.auditService.isAdmin(webId)) {
+      console.error('User is not an admin - cannot create dataspaces');
+      throw new Error('Only administrators can create Data Spaces');
     }
 
     const id = `ds-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -753,7 +760,7 @@ export class DataSpaceService {
     // Parse category
     const category = getStringNoLocale(dataSpaceThing, DS.category) || undefined;
 
-    return {
+    const dataSpace: DataSpace = {
       id,
       title: getStringNoLocale(dataSpaceThing, DCTERMS.title) || '',
       description: getStringNoLocale(dataSpaceThing, DCTERMS.description) || '',
@@ -767,6 +774,57 @@ export class DataSpaceService {
       metadata,
       tags,
       category,
+      allowedUsers: members.map(member => member.webId), // Populate from members
     };
+
+    return dataSpace;
+  }
+
+  /**
+   * Check if a user has access to a dataspace
+   */
+  private checkUserAccess(dataSpace: DataSpace, userWebId: string | undefined): boolean {
+    if (!userWebId) return false;
+
+    // Admins can access all dataspaces
+    if (this.auditService.isAdmin(userWebId)) {
+      return true;
+    }
+
+    // Check if user is a member or in allowed users list
+    const isMember = dataSpace.members.some(member => member.webId === userWebId);
+    const isAllowed = dataSpace.allowedUsers.includes(userWebId);
+
+    return isMember || isAllowed;
+  }
+
+  /**
+   * Grant access to a user for a specific dataspace (admin only)
+   */
+  async grantUserAccess(dataSpaceId: string, userWebId: string, role: DataSpaceRole = 'read'): Promise<void> {
+    const currentWebId = this.auth.getWebId();
+    
+    if (!this.auditService.isAdmin(currentWebId)) {
+      throw new Error('Only administrators can grant user access');
+    }
+
+    await this.addMember(dataSpaceId, userWebId, role);
+    
+    // Log the access grant
+    try {
+      const userName = userWebId.split('/profile')[0].split('/').pop() || 'Unknown User';
+      const adminName = currentWebId?.split('/profile')[0].split('/').pop() || 'Admin';
+      await this.auditService.logEvent({
+        userId: currentWebId!,
+        userName: adminName,
+        action: 'Create',
+        resourceType: 'DataSpace Access',
+        resourceName: dataSpaceId,
+        description: `${adminName} granted ${role} access to ${userName} for dataspace "${dataSpaceId}"`,
+        metadata: { grantedTo: userWebId, role }
+      });
+    } catch (error) {
+      console.warn('Failed to log access grant:', error);
+    }
   }
 }

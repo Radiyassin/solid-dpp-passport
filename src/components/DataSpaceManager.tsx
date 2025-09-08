@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { DataSpaceService, DataSpace } from '@/services/dataSpaceService';
 import { SolidAuthService } from '@/services/solidAuth';
+import { AuditService } from '@/services/auditService';
 import { 
   Plus, 
   Users, 
@@ -31,7 +32,9 @@ const DataSpaceManager = () => {
   
   const dataSpaceService = DataSpaceService.getInstance();
   const auth = SolidAuthService.getInstance();
+  const auditService = AuditService.getInstance();
   const currentWebId = auth.getWebId();
+  const isAdmin = auditService.isAdmin(currentWebId);
 
   useEffect(() => {
     loadDataSpaces();
@@ -55,6 +58,14 @@ const DataSpaceManager = () => {
   };
 
   const handleCreateDataSpace = async () => {
+    if (!isAdmin) {
+      toast({
+        title: 'Access Denied',
+        description: 'Only administrators can create Data Spaces',
+        variant: 'destructive',
+      });
+      return;
+    }
     await loadDataSpaces();
     setShowCreateDialog(false);
     toast({
@@ -138,17 +149,25 @@ const DataSpaceManager = () => {
                 <Settings className="w-4 h-4" />
                 {selectedDataSpace.title}
               </TabsTrigger>
-            )}
+          )}
           </TabsList>
           
-          <Button 
-            onClick={() => setShowCreateDialog(true)}
-            variant="premium"
-            size="lg"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Data Space
-          </Button>
+          {isAdmin && (
+            <Button 
+              onClick={() => setShowCreateDialog(true)}
+              variant="premium"
+              size="lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Data Space
+            </Button>
+          )}
+          
+          {!isAdmin && (
+            <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+              👤 Regular User - Contact admin for new Data Spaces
+            </div>
+          )}
         </div>
 
         <TabsContent value="list" className="space-y-6">
@@ -219,16 +238,21 @@ const DataSpaceManager = () => {
                 <CardContent className="text-center py-12">
                   <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No Data Spaces Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create your first Data Space to start collaborating with others
-                  </p>
-                  <Button 
-                    onClick={() => setShowCreateDialog(true)}
-                    variant="premium"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Data Space
-                  </Button>
+                   <p className="text-muted-foreground mb-4">
+                     {isAdmin ? 
+                       'Create your first Data Space to start collaborating with others' :
+                       'No Data Spaces available yet. Contact an administrator to get access to Data Spaces.'
+                     }
+                   </p>
+                   {isAdmin && (
+                     <Button 
+                       onClick={() => setShowCreateDialog(true)}
+                       variant="premium"
+                     >
+                       <Plus className="w-4 h-4 mr-2" />
+                       Create Your First Data Space
+                     </Button>
+                   )}
                 </CardContent>
               </Card>
             ) : (

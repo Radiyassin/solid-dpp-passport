@@ -12,6 +12,7 @@ export interface AuditEvent {
   resourceName: string;
   description: string;
   metadata?: Record<string, any>;
+  loginCount?: number; // Track how many times user has logged in
 }
 
 export interface AuditEventInput {
@@ -96,16 +97,20 @@ export class AuditService {
   }
 
   /**
-   * Helper method to log user login
+   * Helper method to log user login with count tracking
    */
   async logLogin(userId: string, userName: string): Promise<void> {
+    // Get current login count for this user
+    const loginCount = this.getUserLoginCount(userId) + 1;
+    
     await this.logEvent({
       userId,
       userName,
       action: 'Login',
       resourceType: 'Authentication',
       resourceName: 'User Session',
-      description: `${userName} logged into the application`,
+      description: `${userName} logged into the application (login #${loginCount})`,
+      metadata: { loginCount }
     });
   }
 
@@ -165,6 +170,65 @@ export class AuditService {
       resourceName: elementText || interactionType,
       description: `${userName} ${interactionType} "${elementText}"${page ? ` on ${page}` : ''}`,
     });
+  }
+
+  /**
+   * Get login count for a specific user
+   */
+  getUserLoginCount(userId: string): number {
+    const logs = this.getAuditLogs();
+    return logs.filter(log => 
+      log.userId === userId && 
+      log.action === 'Login' && 
+      log.description.includes('logged into the application')
+    ).length;
+  }
+
+  /**
+   * Get all unique users who have logged in
+   */
+  getLoggedInUsers(): Array<{userId: string, userName: string, loginCount: number, lastLogin: string}> {
+    const logs = this.getAuditLogs();
+    const userMap = new Map<string, {userId: string, userName: string, loginCount: number, lastLogin: string}>();
+    
+    logs.forEach(log => {
+      if (log.action === 'Login' && log.description.includes('logged into the application')) {
+        const existing = userMap.get(log.userId);
+        if (!existing) {
+          userMap.set(log.userId, {
+            userId: log.userId,
+            userName: log.userName,
+            loginCount: 1,
+            lastLogin: log.timestamp
+          });
+        } else {
+          existing.loginCount += 1;
+          // Keep the most recent login timestamp
+          if (new Date(log.timestamp) > new Date(existing.lastLogin)) {
+            existing.lastLogin = log.timestamp;
+          }
+        }
+      }
+    });
+    
+    return Array.from(userMap.values()).sort((a, b) => 
+      new Date(b.lastLogin).getTime() - new Date(a.lastLogin).getTime()
+    );
+  }
+
+  /**
+   * Check if a user is an admin based on WebID
+   */
+  isAdmin(webId: string | undefined): boolean {
+    if (!webId) return false;
+    // Define admin WebIDs - you can modify this logic
+    const adminWebIds = [
+      'https://admin.solidcommunity.net/profile/card#me',
+      'https://admin.solidweb.org/profile/card#me'
+    ];
+    
+    // Also check if the user's Pod URL contains "admin"
+    return adminWebIds.includes(webId) || webId.toLowerCase().includes('admin');
   }
 }
 

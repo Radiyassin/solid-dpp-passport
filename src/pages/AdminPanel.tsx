@@ -3,10 +3,11 @@ import { SolidAuthService } from '@/services/solidAuth';
 import SolidLogin from '@/components/SolidLogin';
 import AdminDPPManager from '@/components/AdminDPPManager';
 import OrgPodSetup from '@/components/OrgPodSetup';
+import UserManagement from '@/components/UserManagement';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, LogOut, Home, Settings, Database } from 'lucide-react';
+import { Shield, LogOut, Home, Settings, Database, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminPanel = () => {
@@ -105,7 +106,7 @@ const AdminPanel = () => {
 
         {/* Admin Tabs */}
         <Tabs defaultValue="dpps" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
             <TabsTrigger value="dpps" className="flex items-center gap-2">
               <Database className="w-4 h-4" />
               DPP Manager
@@ -113,6 +114,10 @@ const AdminPanel = () => {
             <TabsTrigger value="setup" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Org Setup
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              User Management
             </TabsTrigger>
           </TabsList>
 
@@ -122,6 +127,10 @@ const AdminPanel = () => {
 
           <TabsContent value="setup">
             <OrgPodSetup />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UserManagement />
           </TabsContent>
         </Tabs>
       </div>
