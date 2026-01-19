@@ -4,11 +4,13 @@ import { AuditService } from '@/services/auditService';
 import SolidLogin from '@/components/SolidLogin';
 import DPPDashboard from '@/components/DPPDashboard';
 import AuditLogsViewer from '@/components/AuditLogsViewer';
+import { AssetRetrieval } from '@/components/AssetRetrieval';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Settings, Database, LogOut } from 'lucide-react';
+import { Settings, Database, LogOut, Terminal } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { getDefaultSession } from '@inrupt/solid-client-authn-browser';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ORG_WEBID = "https://solid4dpp.solidcommunity.net/profile/card#me";
 
@@ -98,7 +100,21 @@ const Index = () => {
           </Button>
         </div>
         <div className="container mx-auto p-6 pt-20">
-          <AuditLogsViewer />
+          <Tabs defaultValue="audit" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+              <TabsTrigger value="assets">
+                <Terminal className="w-4 h-4 mr-2" />
+                Asset Retrieval
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="audit">
+              <AuditLogsViewer />
+            </TabsContent>
+            <TabsContent value="assets">
+              <AssetRetrieval />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     );
