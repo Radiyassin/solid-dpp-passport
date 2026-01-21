@@ -14,12 +14,14 @@
  *   node retrieve-assets.js -retrieve last-assets --force
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
-
+import fs from 'fs';
+import path from 'path';
+import process from 'process';
+import https from 'https';
+import http from 'http';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
