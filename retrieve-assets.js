@@ -24,7 +24,7 @@ const CONFIG = {
   podUrl: process.env.SOLID_POD_URL || 'https://yourpod.solidcommunity.net',
   
   // Output directory for assets
-  outputDir: path.join(__dirname, 'src', 'assets'),
+  outputDir: path.join(__dirname, 'DATA'),
   
   // Dataspace container path
   dataspaceContainer: '/dataspaces/',
