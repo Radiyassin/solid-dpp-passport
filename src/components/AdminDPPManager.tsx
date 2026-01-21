@@ -64,10 +64,16 @@ const AdminDPPManager = () => {
 
     setIsLoading(true);
     try {
-      await storage.uploadDPP(selectedFile);
+      const fileUrl = await storage.uploadDPP(selectedFile);
+      
+      // Automatically store locally for sync
+      const { localSyncService } = await import('@/services/localSyncService');
+      const podUrl = fileUrl.split('/dpp/')[0] + '/';
+      await localSyncService.storeDPP(selectedFile, podUrl);
+      
       toast({
         title: "Success",
-        description: `${selectedFile.name} uploaded successfully`,
+        description: `${selectedFile.name} uploaded and synced locally`,
       });
       setSelectedFile(null);
       setFileName('');

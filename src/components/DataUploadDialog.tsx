@@ -168,6 +168,14 @@ const DataUploadDialog = ({ open, onOpenChange, dataSpaceId, onSuccess }: DataUp
 
       await dataService.uploadData(dataSpaceId, uploadInput);
       
+      // Automatically store locally for sync
+      const { localSyncService } = await import('@/services/localSyncService');
+      const webId = (await import('@/services/solidAuth')).SolidAuthService.getInstance().getWebId();
+      if (webId) {
+        const podUrl = webId.split('/profile')[0] + '/';
+        await localSyncService.storeDataspaceAsset(selectedFile, podUrl, dataSpaceId);
+      }
+      
       // Reset form
       setSelectedFile(null);
       setFormData({
@@ -183,7 +191,7 @@ const DataUploadDialog = ({ open, onOpenChange, dataSpaceId, onSuccess }: DataUp
       
       toast({
         title: 'Success',
-        description: 'Data uploaded successfully',
+        description: 'Data uploaded and synced locally',
       });
     } catch (error) {
       console.error('Error uploading data:', error);
