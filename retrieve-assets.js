@@ -1,114 +1,458 @@
 #!/usr/bin/env node
 
 /**
- * Asset Retrieval CLI Script
+ * Solid Pod Asset Retrieval CLI
  * 
- * Usage: node retrieve-assets.js
+ * Retrieves uploaded files from Solid Pod and saves them locally to ./DATA/
+ * Mirrors the remote structure:
+ *   - DATA/dpp/          ← {podUrl}/dpp/
+ *   - DATA/dataspaces/   ← {podUrl}/dataspaces/{dataSpaceId}/data/
  * 
- * This script retrieves all assets from your Solid Pod dataspaces
- * and saves them to ./src/assets/ folder
+ * Usage:
+ *   node retrieve-assets.js -retrieve last-assets
+ *   node retrieve-assets.js -retrieve last-assets --dataspace <id>
+ *   node retrieve-assets.js -retrieve last-assets --force
  */
 
-import fs from 'fs';
-import path from 'path';
-import process from 'process';
-import https from 'https';
-import http from 'http';
-import { fileURLToPath } from 'url';
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Configuration - Update these values with your Solid Pod details
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
 const CONFIG = {
-  // Your Solid Pod URL (e.g., 'https://yourpod.solidcommunity.net')
-  podUrl: process.env.SOLID_POD_URL || 'https://yourpod.solidcommunity.net',
+  // Your Solid Pod URL
+  podUrl: process.env.SOLID_POD_URL || 'https://solid4dpp.solidcommunity.net',
   
-  // Output directory for assets
+  // Local output directory
   outputDir: path.join(__dirname, 'DATA'),
   
-  // Dataspace container path
-  dataspaceContainer: '/dataspaces/',
+  // Remote container paths
+  containers: {
+    dpp: '/dpp/',
+    dataspaces: '/dataspaces/',
+  },
 };
 
-// Colors for terminal output
+// ═══════════════════════════════════════════════════════════════════════════
+// TERMINAL COLORS & LOGGING
+// ═══════════════════════════════════════════════════════════════════════════
+
 const colors = {
   reset: '\x1b[0m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   red: '\x1b[31m',
   cyan: '\x1b[36m',
+  blue: '\x1b[34m',
   bold: '\x1b[1m',
+  dim: '\x1b[2m',
 };
 
-function log(message, color = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
+const log = (msg, color = 'reset') => console.log(`${colors[color]}${msg}${colors.reset}`);
+const logStep = (step, msg) => console.log(`${colors.cyan}[${step}]${colors.reset} ${msg}`);
+const logSuccess = (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`);
+const logError = (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`);
+const logInfo = (msg) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`);
+const logWarn = (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`);
 
-function logStep(step, message) {
-  console.log(`${colors.cyan}[${step}]${colors.reset} ${message}`);
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// FILE SYSTEM UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════
 
-function logSuccess(message) {
-  console.log(`${colors.green}✓${colors.reset} ${message}`);
-}
-
-function logError(message) {
-  console.log(`${colors.red}✗${colors.reset} ${message}`);
-}
-
-// Ensure output directory exists
 function ensureDirectoryExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    logSuccess(`Created directory: ${dirPath}`);
+    return true;
   }
+  return false;
 }
 
-// Download a file from URL
-function downloadFile(url, destPath) {
+function fileExists(filePath) {
+  return fs.existsSync(filePath);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTTP UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Make an HTTP request with proper headers for Solid
+ */
+function httpRequest(url, options = {}) {
   return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
+    const parsedUrl = new URL(url);
+    const protocol = parsedUrl.protocol === 'https:' ? https : http;
     
-    const file = fs.createWriteStream(destPath);
+    const reqOptions = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: options.method || 'GET',
+      headers: {
+        'Accept': options.accept || '*/*',
+        ...options.headers,
+      },
+    };
     
-    protocol.get(url, (response) => {
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        // Handle redirects
-        downloadFile(response.headers.location, destPath)
-          .then(resolve)
-          .catch(reject);
-        return;
+    const req = protocol.request(reqOptions, (res) => {
+      // Handle redirects
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        const redirectUrl = res.headers.location;
+        if (redirectUrl) {
+          httpRequest(redirectUrl, options).then(resolve).catch(reject);
+          return;
+        }
       }
       
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: ${response.statusCode}`));
-        return;
+      let data = '';
+      const chunks = [];
+      const isBinary = options.binary;
+      
+      if (isBinary) {
+        res.on('data', chunk => chunks.push(chunk));
+      } else {
+        res.on('data', chunk => data += chunk);
       }
       
-      response.pipe(file);
-      
-      file.on('finish', () => {
-        file.close();
-        resolve(destPath);
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: isBinary ? Buffer.concat(chunks) : data,
+        });
       });
-    }).on('error', (err) => {
-      fs.unlink(destPath, () => {}); // Delete the file on error
-      reject(err);
     });
+    
+    req.on('error', reject);
+    req.end();
   });
 }
 
-// Generate manifest file
+/**
+ * Fetch a Solid container and get its contents as Turtle
+ */
+async function fetchContainer(containerUrl) {
+  try {
+    const response = await httpRequest(containerUrl, {
+      accept: 'text/turtle',
+    });
+    
+    if (response.statusCode === 404) {
+      return { exists: false, resources: [] };
+    }
+    
+    if (response.statusCode !== 200) {
+      throw new Error(`HTTP ${response.statusCode} for ${containerUrl}`);
+    }
+    
+    return {
+      exists: true,
+      turtle: response.body,
+      resources: parseTurtleContainment(response.body, containerUrl),
+    };
+  } catch (error) {
+    if (error.code === 'ENOTFOUND') {
+      throw new Error(`Cannot connect to Pod: ${containerUrl}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Download a file from URL to local path
+ */
+async function downloadFile(url, destPath, force = false) {
+  if (!force && fileExists(destPath)) {
+    return { skipped: true, path: destPath };
+  }
+  
+  // Ensure directory exists
+  ensureDirectoryExists(path.dirname(destPath));
+  
+  const response = await httpRequest(url, { binary: true });
+  
+  if (response.statusCode !== 200) {
+    throw new Error(`Failed to download: HTTP ${response.statusCode}`);
+  }
+  
+  fs.writeFileSync(destPath, response.body);
+  
+  return {
+    skipped: false,
+    path: destPath,
+    size: response.body.length,
+    contentType: response.headers['content-type'],
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TURTLE PARSING (Simple parser for ldp:contains)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Parse Turtle response to extract contained resource URLs
+ * Looks for ldp:contains predicates
+ */
+function parseTurtleContainment(turtle, baseUrl) {
+  const resources = [];
+  
+  // Match ldp:contains patterns
+  // Pattern 1: ldp:contains <url>
+  const containsPattern1 = /ldp:contains\s+<([^>]+)>/g;
+  // Pattern 2: <url> a ldp:Resource (contained items)
+  const resourcePattern = /<([^>]+)>\s+a\s+(?:ldp:Resource|ldp:Container)/g;
+  
+  let match;
+  
+  // Extract from ldp:contains
+  while ((match = containsPattern1.exec(turtle)) !== null) {
+    const url = resolveUrl(match[1], baseUrl);
+    if (!resources.includes(url)) {
+      resources.push(url);
+    }
+  }
+  
+  // Also look for stat:mtime patterns which indicate files
+  const statPattern = /<([^>]+)>\s+stat:mtime/g;
+  while ((match = statPattern.exec(turtle)) !== null) {
+    const url = resolveUrl(match[1], baseUrl);
+    if (!resources.includes(url) && url !== baseUrl) {
+      resources.push(url);
+    }
+  }
+  
+  // Parse prefixed format: :filename a ldp:Resource
+  const prefixedPattern = /:([^\s]+)\s+a\s+ldp:Resource/g;
+  while ((match = prefixedPattern.exec(turtle)) !== null) {
+    const filename = match[1];
+    const url = resolveUrl(filename, baseUrl);
+    if (!resources.includes(url)) {
+      resources.push(url);
+    }
+  }
+  
+  return resources;
+}
+
+/**
+ * Resolve a relative URL against a base URL
+ */
+function resolveUrl(relativeUrl, baseUrl) {
+  try {
+    return new URL(relativeUrl, baseUrl).href;
+  } catch {
+    return relativeUrl;
+  }
+}
+
+/**
+ * Check if URL is a container (ends with /)
+ */
+function isContainer(url) {
+  return url.endsWith('/');
+}
+
+/**
+ * Extract filename from URL
+ */
+function getFilenameFromUrl(url) {
+  const parsedUrl = new URL(url);
+  const pathname = parsedUrl.pathname;
+  return path.basename(pathname);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SOLID POD SYNC LOGIC
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Recursively list all files in a container
+ */
+async function listContainerRecursive(containerUrl, depth = 0) {
+  const files = [];
+  const maxDepth = 5; // Prevent infinite recursion
+  
+  if (depth > maxDepth) {
+    logWarn(`Max depth reached at ${containerUrl}`);
+    return files;
+  }
+  
+  try {
+    const container = await fetchContainer(containerUrl);
+    
+    if (!container.exists) {
+      return files;
+    }
+    
+    for (const resourceUrl of container.resources) {
+      if (isContainer(resourceUrl)) {
+        // Recurse into sub-containers
+        const subFiles = await listContainerRecursive(resourceUrl, depth + 1);
+        files.push(...subFiles);
+      } else {
+        files.push(resourceUrl);
+      }
+    }
+  } catch (error) {
+    logError(`Failed to list ${containerUrl}: ${error.message}`);
+  }
+  
+  return files;
+}
+
+/**
+ * Get relative path from Pod URL to use as local path
+ */
+function getLocalPath(fileUrl, podUrl, outputDir) {
+  const podBase = new URL(podUrl).href;
+  let relativePath = fileUrl.replace(podBase, '');
+  
+  // Remove leading slash
+  if (relativePath.startsWith('/')) {
+    relativePath = relativePath.slice(1);
+  }
+  
+  return path.join(outputDir, relativePath);
+}
+
+/**
+ * Sync DPP files from Pod
+ */
+async function syncDPPFiles(podUrl, outputDir, force = false) {
+  const dppContainerUrl = new URL(CONFIG.containers.dpp, podUrl).href;
+  const localDppDir = path.join(outputDir, 'dpp');
+  
+  logStep('DPP', `Syncing from ${dppContainerUrl}`);
+  ensureDirectoryExists(localDppDir);
+  
+  const files = await listContainerRecursive(dppContainerUrl);
+  const results = [];
+  
+  for (const fileUrl of files) {
+    const localPath = getLocalPath(fileUrl, podUrl, outputDir);
+    
+    try {
+      const result = await downloadFile(fileUrl, localPath, force);
+      results.push({
+        url: fileUrl,
+        localPath: path.relative(outputDir, localPath),
+        type: 'dpp',
+        size: result.size,
+        contentType: result.contentType,
+        skipped: result.skipped,
+        timestamp: new Date().toISOString(),
+      });
+      
+      if (result.skipped) {
+        log(`  ${colors.dim}↷ ${getFilenameFromUrl(fileUrl)} (exists)${colors.reset}`);
+      } else {
+        logSuccess(`  ${getFilenameFromUrl(fileUrl)}`);
+      }
+    } catch (error) {
+      logError(`  ${getFilenameFromUrl(fileUrl)}: ${error.message}`);
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Sync dataspace files from Pod
+ */
+async function syncDataspaceFiles(podUrl, outputDir, force = false, specificDataspace = null) {
+  const dataspacesContainerUrl = new URL(CONFIG.containers.dataspaces, podUrl).href;
+  const localDataspacesDir = path.join(outputDir, 'dataspaces');
+  
+  logStep('DATASPACES', `Syncing from ${dataspacesContainerUrl}`);
+  ensureDirectoryExists(localDataspacesDir);
+  
+  const results = [];
+  
+  try {
+    const container = await fetchContainer(dataspacesContainerUrl);
+    
+    if (!container.exists) {
+      logInfo('  No dataspaces container found');
+      return results;
+    }
+    
+    // Get list of dataspaces
+    const dataspaces = container.resources.filter(isContainer);
+    
+    for (const dataspaceUrl of dataspaces) {
+      const dataspaceName = getFilenameFromUrl(dataspaceUrl.slice(0, -1)); // Remove trailing /
+      
+      // Skip if specific dataspace requested and this isn't it
+      if (specificDataspace && dataspaceName !== specificDataspace) {
+        continue;
+      }
+      
+      log(`\n  ${colors.bold}📁 Dataspace: ${dataspaceName}${colors.reset}`);
+      
+      // Look for data/ subfolder
+      const dataContainerUrl = new URL('data/', dataspaceUrl).href;
+      const files = await listContainerRecursive(dataContainerUrl);
+      
+      for (const fileUrl of files) {
+        const localPath = getLocalPath(fileUrl, podUrl, outputDir);
+        
+        try {
+          const result = await downloadFile(fileUrl, localPath, force);
+          results.push({
+            url: fileUrl,
+            localPath: path.relative(outputDir, localPath),
+            type: 'dataspace-asset',
+            dataspace: dataspaceName,
+            size: result.size,
+            contentType: result.contentType,
+            skipped: result.skipped,
+            timestamp: new Date().toISOString(),
+          });
+          
+          if (result.skipped) {
+            log(`    ${colors.dim}↷ ${getFilenameFromUrl(fileUrl)} (exists)${colors.reset}`);
+          } else {
+            logSuccess(`    ${getFilenameFromUrl(fileUrl)}`);
+          }
+        } catch (error) {
+          logError(`    ${getFilenameFromUrl(fileUrl)}: ${error.message}`);
+        }
+      }
+      
+      if (files.length === 0) {
+        logInfo('    No assets found in this dataspace');
+      }
+    }
+  } catch (error) {
+    logError(`Failed to sync dataspaces: ${error.message}`);
+  }
+  
+  return results;
+}
+
+/**
+ * Generate manifest.json with all retrieved files
+ */
 function generateManifest(assets, outputDir) {
   const manifest = {
     generatedAt: new Date().toISOString(),
-    totalAssets: assets.length,
-    assets: assets.map(asset => ({
-      name: asset.name,
-      localPath: asset.localPath,
+    podUrl: CONFIG.podUrl,
+    totalFiles: assets.length,
+    downloaded: assets.filter(a => !a.skipped).length,
+    skipped: assets.filter(a => a.skipped).length,
+    files: assets.map(asset => ({
       originalUrl: asset.url,
-      size: asset.size || 'unknown',
-      type: asset.type || 'unknown',
+      localPath: asset.localPath,
+      type: asset.type,
+      dataspace: asset.dataspace || null,
+      contentType: asset.contentType || 'unknown',
+      size: asset.size || null,
+      timestamp: asset.timestamp,
     })),
   };
   
@@ -117,159 +461,181 @@ function generateManifest(assets, outputDir) {
   return manifestPath;
 }
 
-// Main retrieval function
-async function retrieveLastAssets() {
-  console.log('\n');
-  log('╔═══════════════════════════════════════════════════════════╗', 'cyan');
-  log('║           SOLID DPP PASSPORT - ASSET RETRIEVAL           ║', 'cyan');
-  log('╚═══════════════════════════════════════════════════════════╝', 'cyan');
-  console.log('\n');
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN SYNC FUNCTION
+// ═══════════════════════════════════════════════════════════════════════════
 
-  logStep('1/5', 'Initializing asset retrieval...');
+async function syncAssets(options = {}) {
+  const { force = false, dataspace = null } = options;
   
-  // Ensure output directory exists
+  console.log('\n');
+  log('╔═══════════════════════════════════════════════════════════════╗', 'cyan');
+  log('║          SOLID POD ASSET SYNC - LOCAL RETRIEVAL              ║', 'cyan');
+  log('╚═══════════════════════════════════════════════════════════════╝', 'cyan');
+  console.log('\n');
+  
+  log(`📡 Pod URL: ${CONFIG.podUrl}`, 'blue');
+  log(`📁 Output:  ${CONFIG.outputDir}`, 'blue');
+  if (force) log(`🔄 Mode:    Force re-download`, 'yellow');
+  if (dataspace) log(`🎯 Filter:  Dataspace "${dataspace}" only`, 'yellow');
+  console.log('\n');
+  
+  // Ensure output directory
   ensureDirectoryExists(CONFIG.outputDir);
   
-  logStep('2/5', 'Checking for local storage data...');
+  const allAssets = [];
   
-  // In a real implementation, this would connect to your Solid Pod
-  // For now, we'll check if there's any cached data locally
+  // Sync DPP files
+  log('─'.repeat(60), 'dim');
+  const dppFiles = await syncDPPFiles(CONFIG.podUrl, CONFIG.outputDir, force);
+  allAssets.push(...dppFiles);
   
-  const localDataPath = path.join(__dirname, '.solid-cache');
-  let assets = [];
+  // Sync Dataspace files
+  console.log('');
+  log('─'.repeat(60), 'dim');
+  const dataspaceFiles = await syncDataspaceFiles(CONFIG.podUrl, CONFIG.outputDir, force, dataspace);
+  allAssets.push(...dataspaceFiles);
   
-  // Check for cached assets data
-  if (fs.existsSync(path.join(localDataPath, 'assets.json'))) {
-    try {
-      const cachedData = JSON.parse(fs.readFileSync(path.join(localDataPath, 'assets.json'), 'utf8'));
-      assets = cachedData.assets || [];
-      logSuccess(`Found ${assets.length} cached assets`);
-    } catch (e) {
-      log('No cached data found, creating sample structure...', 'yellow');
-    }
-  }
-  
-  logStep('3/5', 'Preparing asset downloads...');
-  
-  // If no assets found, create example structure
-  if (assets.length === 0) {
-    log('\n  ℹ️  No assets found in cache.', 'yellow');
-    log('  To retrieve assets from your Solid Pod:', 'yellow');
-    log('  1. Log into the app and upload assets', 'yellow');
-    log('  2. Run this script again\n', 'yellow');
-    
-    // Create example folder structure
-    const examplesDir = path.join(CONFIG.outputDir, 'examples');
-    ensureDirectoryExists(examplesDir);
-    
-    // Create a placeholder README
-    const readmePath = path.join(CONFIG.outputDir, 'README.md');
-    const readmeContent = `# Assets Folder
-
-This folder contains assets retrieved from your Solid Pod dataspaces.
-
-## Structure
-
-- \`/examples/\` - Example assets (placeholders)
-- \`manifest.json\` - List of all retrieved assets
-
-## Usage
-
-Run \`node retrieve-assets.js\` from the project root to sync assets from your Pod.
-
-## Configuration
-
-Edit the CONFIG object in \`retrieve-assets.js\` to update:
-- \`podUrl\` - Your Solid Pod URL
-- \`outputDir\` - Where to save assets
-- \`dataspaceContainer\` - Path to dataspaces in your Pod
-
-Generated: ${new Date().toISOString()}
-`;
-    fs.writeFileSync(readmePath, readmeContent);
-    logSuccess('Created README.md');
-  }
-  
-  logStep('4/5', 'Processing assets...');
-  
-  const downloadedAssets = [];
-  
-  for (const asset of assets) {
-    try {
-      const fileName = asset.name || `asset_${Date.now()}`;
-      const localPath = path.join(CONFIG.outputDir, fileName);
-      
-      if (asset.url) {
-        await downloadFile(asset.url, localPath);
-        downloadedAssets.push({
-          ...asset,
-          localPath: path.relative(__dirname, localPath),
-        });
-        logSuccess(`Downloaded: ${fileName}`);
-      }
-    } catch (error) {
-      logError(`Failed to download ${asset.name}: ${error.message}`);
-    }
-  }
-  
-  logStep('5/5', 'Generating manifest...');
-  
-  // Generate manifest with all assets info
-  const manifestPath = generateManifest(downloadedAssets.length > 0 ? downloadedAssets : [{
-    name: 'placeholder',
-    localPath: 'src/assets/README.md',
-    originalUrl: 'local',
-    type: 'markdown',
-  }], CONFIG.outputDir);
-  
-  logSuccess(`Generated manifest: ${path.relative(__dirname, manifestPath)}`);
-  
-  // Final summary
+  // Generate manifest
   console.log('\n');
-  log('═══════════════════════════════════════════════════════════', 'green');
-  log('                    RETRIEVAL COMPLETE!                     ', 'green');
-  log('═══════════════════════════════════════════════════════════', 'green');
-  console.log('\n');
+  log('─'.repeat(60), 'dim');
+  logStep('MANIFEST', 'Generating manifest.json');
+  const manifestPath = generateManifest(allAssets, CONFIG.outputDir);
+  logSuccess(`Manifest saved: ${path.relative(__dirname, manifestPath)}`);
   
-  log(`  📁 Output Directory: ${CONFIG.outputDir}`, 'cyan');
-  log(`  📄 Assets Retrieved: ${downloadedAssets.length}`, 'cyan');
-  log(`  📋 Manifest: ${manifestPath}`, 'cyan');
+  // Summary
+  const downloaded = allAssets.filter(a => !a.skipped).length;
+  const skipped = allAssets.filter(a => a.skipped).length;
   
   console.log('\n');
-  logSuccess('Done! All assets have been retrieved.');
+  log('═══════════════════════════════════════════════════════════════', 'green');
+  log('                      SYNC COMPLETE!                            ', 'green');
+  log('═══════════════════════════════════════════════════════════════', 'green');
+  console.log('');
+  log(`  📊 Total files:    ${allAssets.length}`, 'cyan');
+  log(`  ⬇️  Downloaded:     ${downloaded}`, 'green');
+  log(`  ↷  Skipped:        ${skipped} (use --force to re-download)`, 'dim');
+  log(`  📁 Location:       ${CONFIG.outputDir}`, 'cyan');
   console.log('\n');
+  
+  return allAssets;
 }
 
-// Parse command line arguments
-const args = process.argv.slice(2);
+// ═══════════════════════════════════════════════════════════════════════════
+// CLI ARGUMENT PARSING
+// ═══════════════════════════════════════════════════════════════════════════
 
-if (args.includes('--help') || args.includes('-h')) {
+function parseArgs(args) {
+  const options = {
+    command: null,
+    force: false,
+    dataspace: null,
+    help: false,
+  };
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg === '--help' || arg === '-h') {
+      options.help = true;
+    } else if (arg === '--force' || arg === '-f') {
+      options.force = true;
+    } else if (arg === '--dataspace' || arg === '-d') {
+      options.dataspace = args[++i];
+    } else if (arg === '-retrieve' || arg === 'retrieve') {
+      options.command = 'retrieve';
+    } else if (arg === 'last-assets') {
+      // Part of retrieve command
+    }
+  }
+  
+  // Default command
+  if (!options.command && !options.help && args.length === 0) {
+    options.command = 'retrieve';
+  }
+  
+  return options;
+}
+
+function showHelp() {
   console.log(`
-${colors.bold}Solid DPP Passport - Asset Retrieval${colors.reset}
+${colors.bold}Solid Pod Asset Sync - Local Retrieval${colors.reset}
+
+${colors.cyan}Description:${colors.reset}
+  Retrieves uploaded files from your Solid Pod and saves them locally
+  to ./DATA/ folder, mirroring the remote structure.
 
 ${colors.cyan}Usage:${colors.reset}
-  node retrieve-assets.js              Retrieve all assets
-  node retrieve-assets.js --help       Show this help message
+  node retrieve-assets.js -retrieve last-assets [options]
+  node retrieve-assets.js [options]
+
+${colors.cyan}Options:${colors.reset}
+  -retrieve last-assets    Sync all assets from Pod to local DATA folder
+  --dataspace <id>, -d     Sync only a specific dataspace
+  --force, -f              Force re-download (overwrite existing files)
+  --help, -h               Show this help message
+
+${colors.cyan}Examples:${colors.reset}
+  node retrieve-assets.js -retrieve last-assets
+  node retrieve-assets.js -retrieve last-assets --force
+  node retrieve-assets.js -retrieve last-assets --dataspace myproject
+  node retrieve-assets.js --dataspace testdata -f
 
 ${colors.cyan}Environment Variables:${colors.reset}
-  SOLID_POD_URL    Your Solid Pod URL (default: https://yourpod.solidcommunity.net)
+  SOLID_POD_URL    Your Solid Pod URL 
+                   (default: ${CONFIG.podUrl})
 
-${colors.cyan}Output:${colors.reset}
-  Assets are saved to: ./src/assets/
-  A manifest.json is generated with all asset metadata.
+${colors.cyan}Output Structure:${colors.reset}
+  DATA/
+  ├── dpp/                      ← DPP files from {podUrl}/dpp/
+  ├── dataspaces/
+  │   ├── {dataSpaceId}/
+  │   │   └── data/             ← Assets from {podUrl}/dataspaces/{id}/data/
+  │   └── ...
+  └── manifest.json             ← Metadata for all retrieved files
+
+${colors.cyan}Manifest Format:${colors.reset}
+  {
+    "generatedAt": "2024-01-01T12:00:00.000Z",
+    "podUrl": "https://...",
+    "totalFiles": 5,
+    "files": [
+      {
+        "originalUrl": "https://pod/dpp/file.json",
+        "localPath": "dpp/file.json",
+        "type": "dpp",
+        "contentType": "application/json",
+        "timestamp": "..."
+      }
+    ]
+  }
 `);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN ENTRY POINT
+// ═══════════════════════════════════════════════════════════════════════════
+
+const args = process.argv.slice(2);
+const options = parseArgs(args);
+
+if (options.help) {
+  showHelp();
   process.exit(0);
 }
 
-// Check if command matches
-const command = args.join(' ');
-if (command === '-retrieve last-assets' || command === 'retrieve last-assets' || args.length === 0) {
-  retrieveLastAssets().catch((error) => {
-    logError(`Error: ${error.message}`);
+if (options.command === 'retrieve' || args.length === 0 || args.join(' ').includes('retrieve')) {
+  syncAssets({
+    force: options.force,
+    dataspace: options.dataspace,
+  }).catch((error) => {
+    logError(`Sync failed: ${error.message}`);
+    if (process.env.DEBUG) {
+      console.error(error);
+    }
     process.exit(1);
   });
 } else {
-  log(`Unknown command: ${command}`, 'red');
-  log('Use --help for usage information', 'yellow');
+  log(`Unknown command. Use --help for usage information.`, 'red');
   process.exit(1);
 }

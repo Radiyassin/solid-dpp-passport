@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { AuditService, AuditEventInput } from '@/services/auditService';
+import { AuditService, AuditEventInput, AuditAction } from '@/services/auditService';
 import { SolidAuthService } from '@/services/solidAuth';
 import { getDefaultSession } from '@inrupt/solid-client-authn-browser';
 import { 
@@ -139,7 +139,7 @@ const AuditDemo = () => {
               <Label htmlFor="action">Action Type</Label>
               <Select
                 value={demoEvent.action}
-                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, action: value any}))}
+                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, action: value as AuditAction }))}
               >
                 <SelectTrigger>
                   <SelectValue />
