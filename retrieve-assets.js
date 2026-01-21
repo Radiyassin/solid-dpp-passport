@@ -9,11 +9,15 @@
  * and saves them to ./src/assets/ folder
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const http = require('http');
+import fs from 'fs';
+import path from 'path';
+import process from 'process';
+import https from 'https';
+import http from 'http';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // Configuration - Update these values with your Solid Pod details
 const CONFIG = {
   // Your Solid Pod URL (e.g., 'https://yourpod.solidcommunity.net')

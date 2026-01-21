@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-01-19T14:35:53.902Z",
+  "totalAssets": 1,
+  "assets": [
+    {
+      "name": "placeholder",
+      "localPath": "src/assets/README.md",
+      "size": "unknown",
+      "type": "markdown"
+    }
+  ]
+}

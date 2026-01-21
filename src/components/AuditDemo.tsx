@@ -50,7 +50,7 @@ const AuditDemo = () => {
       const completeEvent: AuditEventInput = {
         userId: userWebId,
         userName,
-        action: demoEvent.action as any,
+        action: demoEvent.action ,
         resourceType: demoEvent.resourceType || 'Resource',
         resourceName: demoEvent.resourceName || 'Test Resource',
         description: demoEvent.description || `${userName} performed ${demoEvent.action?.toLowerCase()} on ${demoEvent.resourceType}`,
@@ -139,7 +139,7 @@ const AuditDemo = () => {
               <Label htmlFor="action">Action Type</Label>
               <Select
                 value={demoEvent.action}
-                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, action: value as any }))}
+                onValueChange={(value) => setDemoEvent(prev => ({ ...prev, action: value any}))}
               >
                 <SelectTrigger>
                   <SelectValue />
