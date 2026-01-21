@@ -99,12 +99,17 @@ const DPPUpload = ({ onFileUploaded }: DPPUploadProps) => {
 
       const fileUrl = await storage.uploadDPP(selectedFile);
       
+      // Automatically store locally for sync
+      const { localSyncService } = await import('@/services/localSyncService');
+      const podUrl = fileUrl.split('/dpp/')[0] + '/';
+      await localSyncService.storeDPP(selectedFile, podUrl);
+      
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       toast({
         title: 'Upload Successful',
-        description: `DPP file uploaded to your Pod: ${selectedFile.name}`,
+        description: `DPP file uploaded to your Pod and synced locally: ${selectedFile.name}`,
       });
 
       // Reset form
